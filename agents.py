@@ -697,7 +697,7 @@ if __name__ == "__main__":
         print("  No what-if data (single path available for all OD pairs).")
 
     # ── Export metrics ───────────────────────
-    metrics_df.to_csv("logs/simulation_metrics.csv", index=False)
+    metrics_df.to_csv("simulation_metrics.csv", index=False)
     print(f"\n  Metrics saved → simulation_metrics.csv")
     print(f"{'═'*60}\n")
 
