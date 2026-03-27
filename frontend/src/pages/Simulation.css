@@ -1,0 +1,149 @@
+.sim-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 960px) { .sim-layout { grid-template-columns: 1fr; } }
+
+/* Config */
+.config-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.config-row:last-child { border-bottom: none; }
+
+.config-key {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.config-val {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.val-green { color: var(--green); }
+.val-blue  { color: var(--blue); }
+.val-dim   { color: var(--text-dim); }
+
+/* Run */
+.sim-run {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sim-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.sim-result-msg {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Terminal */
+.sim-terminal {
+  padding: 12px 14px;
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sim-line {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sim-line__idx {
+  min-width: 18px;
+  opacity: 0.35;
+  font-size: 10px;
+  padding-top: 1px;
+}
+
+.sim-cursor {
+  width: 7px;
+  height: 13px;
+  background: var(--green);
+  animation: blink 0.8s step-end infinite;
+  margin-left: 28px;
+  border-radius: 1px;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Pipeline */
+.pipeline {
+  padding: 10px 14px 14px;
+}
+
+.pipeline-step {
+  display: flex;
+  gap: 12px;
+}
+
+.pipeline-step__left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 20px;
+}
+
+.pipeline-step__num {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.pipeline-step__line {
+  flex: 1;
+  width: 1px;
+  background: var(--border);
+  margin: 4px 0;
+  min-height: 12px;
+}
+
+.pipeline-step__body {
+  padding-bottom: 12px;
+}
+
+.pipeline-step:last-child .pipeline-step__body {
+  padding-bottom: 0;
+}
+
+.pipeline-step__label {
+  font-size: 12px;
+  color: var(--text-hi);
+  font-weight: 500;
+  font-family: var(--mono);
+}
+
+.pipeline-step__desc {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}

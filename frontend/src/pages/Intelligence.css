@@ -1,0 +1,195 @@
+.intel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) { .intel-grid { grid-template-columns: 1fr; } }
+
+/* ── Card header ── */
+.intel-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  padding-left: 11px;
+}
+
+.intel-card__id   { font-size: 13px; font-weight: 600; min-width: 36px; }
+.intel-card__city { flex: 1; font-size: 12px; color: var(--text-dim); }
+.intel-card__badges { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* ── Tab bar ── */
+.intel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.intel-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s;
+}
+
+.intel-tab:hover { color: var(--text); }
+
+.intel-tab--active {
+  color: var(--text-hi);
+  border-bottom-color: var(--green);
+}
+
+.tab-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.tab-dot--green { background: var(--green); }
+.tab-dot--amber { background: var(--amber); }
+
+/* ── Card body ── */
+.intel-card__body { display: flex; flex-direction: column; }
+
+.intel-card__section {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.intel-card__section:last-child { border-bottom: none; }
+
+.intel-section-title {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.intel-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.intel-card__stats .stat { background: var(--bg-card); padding: 10px 14px; }
+
+.intel-card__driver   { font-size: 12px; color: var(--text-hi); font-weight: 500; }
+.intel-card__reasoning { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+
+.intel-card__conf { padding: 0 14px 12px; }
+
+/* ── Multiplier gauge ── */
+.mult-gauge {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.mult-gauge__label { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+.mult-gauge__track {
+  position: relative; height: 3px;
+  background: var(--border); border-radius: 2px; overflow: visible;
+}
+.mult-gauge__fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  border-radius: 2px; transition: width 0.5s ease;
+}
+.mult-gauge__neutral {
+  position: absolute; top: -3px; width: 1px; height: 9px;
+  background: var(--text-dim); transform: translateX(-50%); border-radius: 1px;
+}
+.mult-gauge__value { font-size: 11px; font-weight: 500; white-space: nowrap; text-align: right; min-width: 50px; }
+.mult-gauge__value .dim { color: var(--text-dim); }
+
+/* ── Event chip ── */
+.event-chip {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 2px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.event-chip__row    { display: flex; gap: 5px; flex-wrap: wrap; }
+.event-chip__name   { font-size: 11px; color: var(--text); font-weight: 500; }
+.event-chip__impact { font-size: 10px; color: var(--amber); font-family: var(--mono); }
+
+/* ── Narrative tab ── */
+.narrative-tab  { max-height: 440px; overflow-y: auto; }
+.signals-tab    { max-height: 440px; overflow-y: auto; }
+
+.narrative-plain {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.narrative-sections { display: flex; flex-direction: column; gap: 14px; }
+
+.narrative-section {}
+
+.narrative-heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-hi);
+  margin-bottom: 5px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.narrative-body {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.narrative-empty,
+.signal-empty {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* ── Signal list ── */
+.signal-list { display: flex; flex-direction: column; gap: 8px; }
+
+.signal-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.signal-line .badge { flex-shrink: 0; margin-top: 1px; }
+
+.signal-body {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.6;
+}

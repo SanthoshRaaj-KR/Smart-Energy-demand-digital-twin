@@ -1,0 +1,44 @@
+/* ── Global Reset & Variables ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0c0f;
+  --bg-panel:  #0f1218;
+  --bg-card:   #141820;
+  --border:    #1e2530;
+  --border-hi: #2a3545;
+
+  --text:      #c8d4e0;
+  --text-dim:  #5a6a7a;
+  --text-hi:   #e8f0f8;
+
+  --green:     #00e5a0;
+  --green-dim: #00e5a015;
+  --red:       #ff4560;
+  --red-dim:   #ff456010;
+  --amber:     #ffb020;
+  --amber-dim: #ffb02010;
+  --blue:      #3d9eff;
+  --blue-dim:  #3d9eff10;
+
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+/* Utility */
+.mono { font-family: var(--mono); }

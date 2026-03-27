@@ -1,0 +1,9 @@
+.env
+anaconda_projects
+.virtual_documents
+.ipynb_checkpoints
+__pycache__
+context_cache
+outputs
+requirements_but_it_actually_runs.txt
+venv/
