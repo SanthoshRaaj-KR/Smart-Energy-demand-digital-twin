@@ -1,3 +1,10 @@
+# Execution steps
+
+```
+git clone https://github.com/SanthoshRaaj-KR/DemandForecasting-PowerGrid
+cd DemandForecasting-PowerGrid
+```
+
 ### Terminal 1
 ```
 cd backend
