@@ -2,17 +2,9 @@
 import { useState } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, ReferenceLine
+  ResponsiveContainer
 } from 'recharts'
-import { FORECAST_DATA, REGIONS } from '@/lib/data'
-import { SectionLabel } from '@/components/ui/Primitives'
-
-const COLORS = {
-  BHR: '#00d4ff',
-  UP:  '#0066ff',
-  WB:  '#8b5cf6',
-  KAR: '#10b981',
-}
+import { REGIONS } from '@/lib/gridMeta'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -26,30 +18,31 @@ const CustomTooltip = ({ active, payload, label }) => {
           <span className="font-bold text-white">{Math.round(p.value).toLocaleString()} MW</span>
         </div>
       ))}
-      {payload[0]?.payload?.tempBHR && (
-        <div className="mt-2 pt-2 border-t border-grid-border/50 text-grid-textDim">
-          🌡 Bihar: {payload[0].payload.tempBHR.toFixed(1)}°C
-        </div>
-      )}
     </div>
   )
 }
 
-export function ForecastChart() {
-  const [activeRegions, setActiveRegions] = useState(new Set(['BHR', 'UP', 'WB', 'KAR']))
+export function ForecastChart({ forecastData = [] }) {
+  const [activeRegions, setActiveRegions] = useState(new Set(REGIONS.map(r => r.id)))
 
   const toggleRegion = (id) => {
     setActiveRegions(prev => {
       const next = new Set(prev)
-      if (next.has(id)) { if (next.size > 1) next.delete(id) }
-      else next.add(id)
+      if (next.has(id)) {
+        if (next.size > 1) next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
 
+  if (!forecastData.length) {
+    return <div className="text-grid-textDim text-sm py-8 text-center">No forecast data available</div>
+  }
+
   return (
     <div>
-      {/* Region toggles */}
       <div className="flex flex-wrap gap-2 mb-4">
         {REGIONS.map(r => (
           <button
@@ -73,11 +66,11 @@ export function ForecastChart() {
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={FORECAST_DATA} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+        <AreaChart data={forecastData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
           <defs>
             {REGIONS.map(r => (
               <linearGradient key={r.id} id={`grad-${r.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={r.color} stopOpacity={0.3} />
+                <stop offset="5%" stopColor={r.color} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={r.color} stopOpacity={0} />
               </linearGradient>
             ))}
@@ -94,7 +87,7 @@ export function ForecastChart() {
             tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'IBM Plex Mono' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={v => `${(v/1000).toFixed(1)}k`}
+            tickFormatter={v => `${(v / 1000).toFixed(1)}k`}
             width={42}
           />
           <Tooltip content={<CustomTooltip />} />
@@ -117,7 +110,7 @@ export function ForecastChart() {
 
       <div className="flex items-center justify-between mt-2 text-[10px] text-grid-textDim"
         style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-        <span>LightGBM • 7-Day Horizon • Climate-Adjusted</span>
+        <span>7-day projection from live grid and intelligence deltas</span>
         <span>Units: MW</span>
       </div>
     </div>

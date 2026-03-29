@@ -1,37 +1,64 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Activity, Cpu, GitBranch, Zap, Wind, BarChart2, CloudLightning, ChevronRight } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Activity, Cpu, GitBranch, Zap, BarChart2, CloudLightning, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { ForecastChart } from '@/components/charts/ForecastChart'
 import { GridMap } from '@/components/grid/GridMap'
 import { Card, SectionLabel, StatBlock, ProgressBar, Badge } from '@/components/ui/Primitives'
-import { GRID_STATUS, REGIONS, FORECAST_DATA } from '@/lib/data'
+import { useGridStatus, useIntelligence } from '@/hooks/useApi'
+import { REGIONS } from '@/lib/gridMeta'
 
 const FEATURE_CARDS = [
   {
     icon: Cpu,
     color: '#00d4ff',
     title: 'Hybrid ML/AI Forecasting',
-    body: 'LightGBM models trained on 5-year NLDC data, climate indices, and industrial calendars. 7-day rolling horizon with climate-adjusted confidence bands.',
+    body: 'Live demand and intelligence context are fused into a short horizon projection for each region.',
   },
   {
     icon: GitBranch,
     color: '#0066ff',
     title: 'Agentic Market Clearing',
-    body: 'State Agents, Routing Agent, and Fusion Agent negotiate energy trades in real-time using LLM reasoning — mimicking India\'s actual DEEP portal dynamics.',
+    body: 'State, Routing, and Fusion agents clear demand and supply via simulation dispatch flow.',
   },
   {
     icon: CloudLightning,
     color: '#10b981',
     title: 'Climate-Aware Dispatch',
-    body: 'Carbon tax optimization at ₹850/tonne. Solar surplus routing from Karnataka HVDC corridors. Pre-monsoon generation scheduling for WB thermal offsets.',
+    body: 'Weather and risk flags are propagated into the trading and balancing loop through backend intelligence.',
   },
 ]
 
-function LiveStatRow() {
-  const regions = Object.entries(GRID_STATUS)
-  const totalDemand = regions.reduce((s, [, v]) => s + v.demand, 0)
-  const totalSupply = regions.reduce((s, [, v]) => s + v.supply, 0)
+function buildForecastData(nodes = [], intelligence = null) {
+  if (!nodes.length) return []
+
+  const byId = Object.fromEntries(nodes.map(node => [node.id, node]))
+  const start = new Date()
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start)
+    d.setDate(d.getDate() + i)
+
+    const row = {
+      day: d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }),
+    }
+
+    for (const region of REGIONS) {
+      const node = byId[region.id]
+      const base = Number(node?.adjusted_demand_mw || node?.demand_mw || 0)
+      const intel = intelligence?.[region.id]?.grid_multipliers || {}
+      const delta7d = Number(intel.seven_day_demand_forecast_mw_delta || 0)
+      const value = base + (delta7d * (i / 6))
+      row[region.id] = Number.isFinite(value) ? Math.max(0, value) : 0
+    }
+
+    return row
+  })
+}
+
+function LiveStatRow({ nodes }) {
+  const totalDemand = nodes.reduce((sum, node) => sum + Number(node.adjusted_demand_mw || node.demand_mw || 0), 0)
+  const totalSupply = nodes.reduce((sum, node) => sum + Number(node.generation_mw || 0), 0)
   const netBalance = totalSupply - totalDemand
 
   return (
@@ -39,24 +66,29 @@ function LiveStatRow() {
       {[
         { label: 'Total Demand', value: (totalDemand / 1000).toFixed(1), unit: 'GW', color: 'text-amber-400' },
         { label: 'Total Supply', value: (totalSupply / 1000).toFixed(1), unit: 'GW', color: 'text-green-400' },
-        { label: 'Net Balance', value: (netBalance > 0 ? '+' : '') + netBalance, unit: 'MW', color: netBalance >= 0 ? 'text-cyan-400' : 'text-red-400' },
-        { label: 'Active Regions', value: '4', unit: 'nodes', color: 'text-purple-400' },
-      ].map(s => (
-        <Card key={s.label} className="py-4">
-          <StatBlock {...s} />
+        { label: 'Net Balance', value: (netBalance > 0 ? '+' : '') + netBalance.toFixed(1), unit: 'MW', color: netBalance >= 0 ? 'text-cyan-400' : 'text-red-400' },
+        { label: 'Active Regions', value: nodes.length, unit: 'nodes', color: 'text-purple-400' },
+      ].map(stat => (
+        <Card key={stat.label} className="py-4">
+          <StatBlock {...stat} />
         </Card>
       ))}
     </div>
   )
 }
 
-function RegionStatusRow() {
+function RegionStatusRow({ nodes }) {
+  const byId = Object.fromEntries(nodes.map(node => [node.id, node]))
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {REGIONS.map(region => {
-        const status = GRID_STATUS[region.id]
-        const isDeficit = status.deficit < 0
-        const socPct = Math.round(status.battery_soc * 100)
+        const status = byId[region.id]
+        const supply = Number(status?.generation_mw || 0)
+        const demand = Number(status?.adjusted_demand_mw || status?.demand_mw || 0)
+        const balance = Number(status?.balance_mw || 0)
+        const soc = Number(status?.battery?.soc || 0)
+        const socPct = Math.round(soc * 100)
 
         return (
           <Card key={region.id} className="p-4">
@@ -68,8 +100,8 @@ function RegionStatusRow() {
                 </div>
                 <div className="text-[10px] text-grid-textDim">{region.name}</div>
               </div>
-              <Badge variant={isDeficit ? 'red' : 'green'}>
-                {isDeficit ? `▼${Math.abs(status.deficit)}` : `▲${status.deficit}`} MW
+              <Badge variant={balance < 0 ? 'red' : 'green'}>
+                {balance < 0 ? `v${Math.abs(balance).toFixed(1)}` : `^${balance.toFixed(1)}`} MW
               </Badge>
             </div>
 
@@ -78,12 +110,12 @@ function RegionStatusRow() {
                 <div className="flex justify-between text-[10px] text-grid-textDim mb-1">
                   <span>Supply / Demand</span>
                   <span style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-                    {status.supply} / {status.demand} MW
+                    {supply.toFixed(1)} / {demand.toFixed(1)} MW
                   </span>
                 </div>
                 <ProgressBar
-                  value={status.supply}
-                  max={Math.max(status.supply, status.demand)}
+                  value={supply}
+                  max={Math.max(supply, demand, 1)}
                   color={region.color}
                 />
               </div>
@@ -108,13 +140,18 @@ function RegionStatusRow() {
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
+  const { data: gridStatus } = useGridStatus()
+  const { data: intelligence } = useIntelligence()
+
   useEffect(() => setMounted(true), [])
+
+  const nodes = gridStatus?.nodes || []
+  const edges = gridStatus?.edges || []
+  const forecastData = useMemo(() => buildForecastData(nodes, intelligence), [nodes, intelligence])
 
   return (
     <div className="pt-14">
-      {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className="relative min-h-[85vh] flex flex-col items-center justify-center overflow-hidden grid-dots">
-        {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-5"
             style={{ background: 'radial-gradient(circle, #00d4ff, transparent)', filter: 'blur(60px)' }} />
@@ -124,7 +161,6 @@ export default function HomePage() {
 
         <div className="max-w-7xl mx-auto px-6 w-full">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left: Copy */}
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-px w-8 bg-cyan-400" />
@@ -144,7 +180,7 @@ export default function HomePage() {
               </h1>
 
               <p className="text-grid-textDim text-base leading-relaxed mb-8 max-w-lg">
-                A real-time simulation platform fusing <strong className="text-white">LightGBM demand forecasting</strong> with <strong className="text-white">multi-agent LLM negotiation</strong> to model India's national grid — Bihar, UP, West Bengal, and Karnataka.
+                Real-time simulation platform integrating live grid status, intelligence multipliers, and agent-based dispatch execution.
               </p>
 
               <div className="flex flex-wrap gap-3">
@@ -164,7 +200,6 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              {/* Tech badges */}
               <div className="flex flex-wrap gap-2 mt-6">
                 {['LightGBM', 'FastAPI', 'LLM Agents', 'Real-time', 'Carbon-Aware'].map(tag => (
                   <span key={tag} className="text-[9px] px-2 py-0.5 rounded border border-grid-border/60 text-grid-textDim"
@@ -175,7 +210,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right: Grid Map */}
             <div className="relative">
               <div className="glass rounded-2xl p-4 glow-cyan">
                 <div className="flex items-center justify-between mb-3">
@@ -186,14 +220,13 @@ export default function HomePage() {
                     LIVE
                   </div>
                 </div>
-                {mounted && <GridMap animated={true} className="h-64 lg:h-80" />}
+                {mounted && <GridMap animated className="h-64 lg:h-80" nodes={nodes} edges={edges} />}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Live Status ───────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex items-center gap-3 mb-4">
           <SectionLabel>Real-Time Grid Status</SectionLabel>
@@ -203,13 +236,12 @@ export default function HomePage() {
             Updated: {new Date().toLocaleTimeString('en-IN')} IST
           </span>
         </div>
-        <LiveStatRow />
+        <LiveStatRow nodes={nodes} />
         <div className="mt-3">
-          <RegionStatusRow />
+          <RegionStatusRow nodes={nodes} />
         </div>
       </section>
 
-      {/* ── Forecast Chart ────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-6 py-6">
         <Card>
           <div className="flex items-center justify-between mb-4">
@@ -218,18 +250,17 @@ export default function HomePage() {
                 style={{ fontFamily: 'Rajdhani, sans-serif' }}>
                 7-Day Demand Forecast
               </div>
-              <div className="text-xs text-grid-textDim">LightGBM · Climate-Adjusted · 4 Regions</div>
+              <div className="text-xs text-grid-textDim">Derived from live demand and intelligence deltas</div>
             </div>
             <Badge variant="cyan">
               <BarChart2 className="w-3 h-3" />
-              ML FORECAST
+              LIVE FORECAST
             </Badge>
           </div>
-          <ForecastChart />
+          <ForecastChart forecastData={forecastData} />
         </Card>
       </section>
 
-      {/* ── What We Do ────────────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-6 py-8">
         <div className="text-center mb-8">
           <div className="text-[10px] uppercase tracking-[0.3em] text-cyan-400 mb-2"
@@ -261,7 +292,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer spacer ─────────────────────────────────────────── */}
       <div className="h-12" />
     </div>
   )

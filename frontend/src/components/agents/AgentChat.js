@@ -1,19 +1,17 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { REGIONS } from '@/lib/data'
 
 const AGENT_DEFS = {
-  BHR_AGENT: { name: 'Bihar Agent',    id: 'BHR', color: '#00d4ff', side: 'left',   avatar: '🏙' },
-  UP_AGENT:  { name: 'UP Agent',       id: 'UP',  color: '#0066ff', side: 'right',  avatar: '🌾' },
-  WB_AGENT:  { name: 'W.Bengal Agent', id: 'WB',  color: '#8b5cf6', side: 'left',   avatar: '⚓' },
-  KAR_AGENT: { name: 'Karnataka Agent',id: 'KAR', color: '#10b981', side: 'right',  avatar: '☀️' },
-  ROUTING:   { name: 'Routing Agent',  id: 'RT',  color: '#f59e0b', side: 'center', avatar: '🔀' },
-  FUSION:    { name: 'Fusion Agent',   id: 'FUS', color: '#ef4444', side: 'center', avatar: '🧠' },
+  BHR_AGENT: { name: 'Bihar Agent', color: '#00d4ff', side: 'left', avatar: 'BH' },
+  UP_AGENT: { name: 'UP Agent', color: '#0066ff', side: 'right', avatar: 'UP' },
+  WB_AGENT: { name: 'W.Bengal Agent', color: '#8b5cf6', side: 'left', avatar: 'WB' },
+  KAR_AGENT: { name: 'Karnataka Agent', color: '#10b981', side: 'right', avatar: 'KR' },
+  ROUTING: { name: 'Routing Agent', color: '#f59e0b', side: 'center', avatar: 'RT' },
+  FUSION: { name: 'Fusion Agent', color: '#ef4444', side: 'center', avatar: 'FS' },
 }
 
 export function AgentChat({ logs }) {
-  const agentLogs = logs.filter(l => AGENT_DEFS[l.agent])
-  const visibleLogs = agentLogs.slice(-8) // show last 8 agent messages
+  const agentLogs = logs.filter(log => AGENT_DEFS[log.agent])
+  const visibleLogs = agentLogs.slice(-8)
 
   if (agentLogs.length === 0) {
     return (
@@ -28,6 +26,7 @@ export function AgentChat({ logs }) {
       {visibleLogs.map((log, i) => {
         const def = AGENT_DEFS[log.agent]
         if (!def) return null
+
         const isRight = def.side === 'right'
         const isCenter = def.side === 'center'
 
@@ -60,15 +59,13 @@ export function AgentChat({ logs }) {
             className={`flex items-start gap-2 ${isRight ? 'flex-row-reverse' : ''}`}
             style={{ animation: 'count-up 0.3s ease-out' }}
           >
-            {/* Avatar */}
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 mt-0.5"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5"
               style={{ background: `${def.color}18`, border: `1.5px solid ${def.color}40` }}
             >
               {def.avatar}
             </div>
 
-            {/* Bubble */}
             <div className={`max-w-xs ${isRight ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
               <div
                 className="text-[9px] opacity-60"

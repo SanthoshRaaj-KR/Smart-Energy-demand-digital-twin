@@ -1,17 +1,18 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { INTELLIGENCE_DATA, GRID_STATUS, DISPATCH_RESULTS, SIM_LOGS } from '@/lib/data'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-// Generic fetch with fallback to mock data
-async function apiFetch(path, mock) {
+async function apiFetch(path, options = {}) {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' })
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: 'no-store',
+      ...options,
+    })
     if (!res.ok) throw new Error('API error')
     return await res.json()
   } catch {
-    return mock
+    return null
   }
 }
 
@@ -20,7 +21,7 @@ export function useIntelligence() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch('/api/intelligence', INTELLIGENCE_DATA).then(d => {
+    apiFetch('/api/intelligence').then(d => {
       setData(d)
       setLoading(false)
     })
@@ -30,11 +31,11 @@ export function useIntelligence() {
 }
 
 export function useGridStatus() {
-  const [data, setData] = useState(GRID_STATUS)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch('/api/grid-status', GRID_STATUS).then(d => {
+    apiFetch('/api/grid-status').then(d => {
       setData(d)
       setLoading(false)
     })
@@ -49,19 +50,36 @@ export function useSimulation() {
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)
 
+  useEffect(() => {
+    apiFetch('/api/simulation-result').then(d => {
+      if (d?.dispatches) {
+        setResults(d)
+        setDone(true)
+      }
+    })
+  }, [])
+
+  const inferAgent = (text) => {
+    const line = text.toUpperCase()
+    if (line.includes('FUSION')) return 'FUSION'
+    if (line.includes('ROUTING') || line.includes('PATH')) return 'ROUTING'
+    if (line.includes('BHR') || line.includes('BIHAR')) return 'BHR_AGENT'
+    if (line.includes('UP')) return 'UP_AGENT'
+    if (line.includes('WB') || line.includes('BENGAL')) return 'WB_AGENT'
+    if (line.includes('KAR') || line.includes('KARNATAKA')) return 'KAR_AGENT'
+    return 'SYSTEM'
+  }
+
   const runSimulation = useCallback(async () => {
     setLogs([])
     setResults(null)
     setRunning(true)
     setDone(false)
 
-    // Try real SSE stream, fall back to mock
     try {
       const res = await fetch(`${API_BASE}/api/run-simulation`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: 'default' }),
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(600000),
       })
       if (!res.ok || !res.body) throw new Error()
 
@@ -74,26 +92,22 @@ export function useSimulation() {
         if (streamDone) break
         buffer += decoder.decode(value)
         const lines = buffer.split('\n')
-        buffer = lines.pop()
+        buffer = lines.pop() || ''
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const text = line.slice(6)
-            setLogs(prev => [...prev, { text, agent: 'STREAM', delay: 0 }])
+          const text = line.trim()
+          if (text) {
+            setLogs(prev => [...prev, { text, agent: inferAgent(text) }])
           }
         }
       }
-    } catch {
-      // Mock simulation with delays
-      for (const log of SIM_LOGS) {
-        await new Promise(r => setTimeout(r, log.delay > 0
-          ? (logs.length === 0 ? log.delay : 600)
-          : 100))
-        setLogs(prev => [...prev, log])
-      }
-    }
 
-    // Load results
-    const res = await apiFetch('/api/simulation-result', DISPATCH_RESULTS)
+      if (buffer.trim()) {
+        const text = buffer.trim()
+        setLogs(prev => [...prev, { text, agent: inferAgent(text) }])
+      }
+    } catch {}
+
+    const res = await apiFetch('/api/simulation-result')
     setResults(res)
     setRunning(false)
     setDone(true)
