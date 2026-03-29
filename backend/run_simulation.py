@@ -337,6 +337,8 @@ def run_simulation():
     adapter = GridEnvAdapter(env, contexts)
     router = RoutingAgent(grid_env=adapter, green_mode=True)
 
+    dispatches_all_days: List[DispatchRecord] = []
+
     for day in range(SIMULATION_DAYS):
         env.current_day = day
         sim_date = (date.today() + timedelta(days=day)).isoformat()
@@ -369,9 +371,20 @@ def run_simulation():
         battery_actions = run_battery_phase(env)
         print_battery_actions(battery_actions)
         print_grid_status(env)
+        dispatches_all_days.extend(dispatches)
         env.advance_day()
 
-    def _write_simulation_result(dispatches_all_days, env):
+    # write output file and final summary before returning
+    write_simulation_result(dispatches_all_days, env)
+
+    print(f"\n{'━' * 80}")
+    print("  ✅ SIMULATION COMPLETE")
+    print(f"  📅 Days simulated: {SIMULATION_DAYS}")
+    print(f"  🏭 Regions: BHR, UP, WB, KAR")
+    print(f"{'━' * 80}\n")
+
+
+def write_simulation_result(dispatches_all_days, env):
     """Serialise dispatch records to JSON for the API server."""
     output = []
     for record in dispatches_all_days:
@@ -424,13 +437,6 @@ def run_simulation():
     out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"  Results JSON → {out_path}")
 
-
-    # ─── Final summary ──────────────────────────────────────────────
-    print(f"\n{'━' * 80}")
-    print("  ✅ SIMULATION COMPLETE")
-    print(f"  📅 Days simulated: {SIMULATION_DAYS}")
-    print(f"  🏭 Regions: BHR, UP, WB, KAR")
-    print(f"{'━' * 80}\n")
 
 if __name__ == "__main__":
     run_simulation()

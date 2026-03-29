@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { runSimulation } from '../api';
+import { runSimulation, runIntelligence } from '../api';
 import { Card, SectionHeader, Button, Badge } from '../components/Primitives';
+import EndpointRunner from '../components/EndpointRunner';
 import './Simulation.css';
 
 const PIPELINE_PHASES = [
@@ -18,14 +19,6 @@ const MARKET_PHASES = [
   { label: 'SyndicateBroker',       desc: 'Pool sellers to fulfill large buyer orders',            icon: '◑' },
   { label: 'RoutingAgent',          desc: 'DLR + carbon tariff + LLM safety → DispatchRecords',   icon: '⇄' },
   { label: 'BatteryPhase',          desc: 'Absorb surplus / cover residual deficit',               icon: '⊟' },
-];
-
-const CONFIG = [
-  { key: 'simulation_days',          label: 'Simulation Days',           value: '1',    type: 'number' },
-  { key: 'green_mode',               label: 'Green Mode (Carbon Tariff)',value: 'true', type: 'bool'   },
-  { key: 'seed',                     label: 'Random Seed',               value: '42',   type: 'number' },
-  { key: 'lgb_inference',            label: 'LightGBM Inference',        value: 'true', type: 'bool'   },
-  { key: 'llm_approval_probability', label: 'LLM Safety Approval %',     value: '90',   type: 'number' },
 ];
 
 function lineColor(line) {
@@ -65,38 +58,94 @@ export default function Simulation() {
       </div>
 
       <div className="sim-layout">
-        {/* ── Left column ── */}
-        <div className="sim-left">
+        {/* Left column - Workflow Controls */}
+        <div className="sim-left" style={{ maxWidth: 600 }}>
 
-          {/* Config */}
+
+          {/* Workflow Steps */}
+          <div style={{ marginBottom: 12 }}>
+            <SectionHeader title="Workflow" subtitle="3-step pipeline" />
+          </div>
+
+          {/* Step 1: Generate Intelligence */}
           <Card style={{ marginBottom: 12 }}>
-            <SectionHeader title="Configuration" subtitle="run_simulation.py parameters" />
-            <div className="config-table">
-              {CONFIG.map((c) => (
-                <div key={c.key} className="config-row">
-                  <span className="config-key mono">{c.key}</span>
-                  <span className={`config-val mono ${c.type === 'bool' ? (c.value === 'true' ? 'val-green' : 'val-dim') : 'val-blue'}`}>
-                    {c.value}
-                  </span>
-                </div>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              <Badge label="STEP 1" variant="blue" />
+              <span style={{ marginLeft: 8, fontSize: '0.95rem', fontWeight: 500 }}>Generate Intelligence</span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: 12 }}>
+              Run the 7-phase LLM pipeline to analyze grid state, detect events, and compute risk multipliers.
+            </div>
+            <Button
+              variant="primary"
+              onClick={async () => {
+                setRunning(true);
+                setLog(['[STEP 1] Starting intelligence pipeline...']);
+                try {
+                  const result = await runIntelligence();
+                  setLog((prev) => [...prev, `✓ Intelligence generated: ${result.nodes_generated || 0} nodes`]);
+                  setLog((prev) => [...prev, `✓ Date: ${result.date}`]);
+                  setLog((prev) => [...prev, '']);
+                  setLog((prev) => [...prev, '→ STEP 1 COMPLETE. Proceed to Step 2 (Generate Intelligence) or Step 3 (Simulate).']);
+                } catch (err) {
+                  setLog((prev) => [...prev, `✗ Error: ${err.message || err}`]);
+                } finally {
+                  setRunning(false);
+                }
+              }}
+              disabled={running}
+              style={{ width: '100%' }}
+            >
+              {running ? '⟳ Generating...' : '► Generate Intelligence'}
+            </Button>
+          </Card>
+
+          {/* Step 2: Optionally Fetch Intelligence Details */}
+          <Card style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              <Badge label="STEP 2" variant="blue" />
+              <span style={{ marginLeft: 8, fontSize: '0.95rem', fontWeight: 500 }}>Review Intelligence (Optional)</span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: 12 }}>
+              After generating intelligence, view details in the "Intelligence" page (risk flags, events, weather, narratives).
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button variant="secondary" disabled style={{ flex: 1 }}>
+                → See Grid Status Page
+              </Button>
+              <Button variant="secondary" disabled style={{ flex: 1 }}>
+                → See Intelligence Page
+              </Button>
             </div>
           </Card>
 
-          {/* Run button + status */}
-          <div className="sim-run">
-            <Button variant="primary" onClick={handleRun} loading={running} disabled={running}>
-              {running ? 'Running simulation...' : '▷  Run Simulation'}
+          {/* Step 3: Run Simulation */}
+          <Card style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              <Badge label="STEP 3" variant="blue" />
+              <span style={{ marginLeft: 8, fontSize: '0.95rem', fontWeight: 500 }}>Run Simulation</span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: 12 }}>
+              Execute market clearing: pool BUY/SELL orders, route power with DLR + carbon tariff, and generate dispatch log.
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleRun}
+              loading={running}
+              disabled={running}
+              style={{ width: '100%' }}
+            >
+              {running ? '⟳ Running simulation...' : '► Run Simulation'}
             </Button>
             {done && (
-              <div className="sim-result">
+              <div className="sim-result" style={{ marginTop: 12 }}>
                 <Badge label="COMPLETE" variant="green" />
-                <span className="sim-result-msg">
-                  Refresh Grid Status &amp; Dispatch Log pages to see updated data.
+                <span className="sim-result-msg" style={{ marginLeft: 8 }}>
+                  View Dispatch Log &amp; Grid Status for results.
                 </span>
               </div>
             )}
-          </div>
+          </Card>
 
           {/* Terminal */}
           {log.length > 0 && (
@@ -113,10 +162,16 @@ export default function Simulation() {
               </div>
             </Card>
           )}
+
+          <EndpointRunner />
         </div>
 
-        {/* ── Right column — reference ── */}
-        <div className="sim-right">
+        {/* Right column - Architecture Reference */}
+        <div className="sim-right" style={{ minWidth: 350 }}>
+          <div style={{ marginBottom: 12 }}>
+            <SectionHeader title="Reference Docs" subtitle="Architecture & pipeline details" />
+          </div>
+
           <Card style={{ marginBottom: 12 }}>
             <SectionHeader title="Intelligence Pipeline" subtitle="7-phase LLM agent chain" />
             <div className="pipeline">

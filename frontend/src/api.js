@@ -177,6 +177,33 @@ export async function fetchDispatchLog() {
   }
 }
 
+export async function runIntelligence() {
+  try {
+    return await apiFetch('/api/generate-intelligence', { method: 'POST' });
+  } catch (err) {
+    console.warn('[api] /api/generate-intelligence failed', err);
+    throw err;
+  }
+}
+
+export async function fetchHealth() {
+  try {
+    return await apiFetch('/api/health');
+  } catch {
+    console.warn('[api] /api/health unreachable - returning fallback');
+    return { status: 'offline', date: new Date().toISOString().slice(0, 10) };
+  }
+}
+
+export async function fetchSimulationResult() {
+  try {
+    return await apiFetch('/api/simulation-result');
+  } catch (err) {
+    console.warn('[api] /api/simulation-result failed', err);
+    throw err;
+  }
+}
+
 /**
  * Run the simulation and stream stdout lines back.
  * onLine(str) is called for each line received.

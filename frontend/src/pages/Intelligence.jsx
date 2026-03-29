@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchIntelligence } from '../api';
-import { Card, SectionHeader, Stat, Skeleton, RiskBadge, Badge, Meter } from '../components/Primitives';
+import { fetchIntelligence, runIntelligence } from '../api';
+import { Card, Stat, Skeleton, RiskBadge, Badge, Meter, Button } from '../components/Primitives';
 import './Intelligence.css';
 
 const CITY_COLORS = { BHR: '#3d9eff', UP: '#00e5a0', WB: '#ff4560', KAR: '#ffb020' };
@@ -211,9 +211,28 @@ function NodeIntelCard({ nodeId, data }) {
 export default function Intelligence() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
+
+  const loadIntelligence = async () => {
+    setError('');
+    try {
+      const d = await fetchIntelligence();
+      setData(d);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      setError(`Intelligence fetch failed: ${err.message || err}`);
+    } finally {
+      setLoading(false);
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
-    fetchIntelligence().then((d) => { setData(d); setLoading(false); });
+    loadIntelligence();
+    const id = setInterval(loadIntelligence, 12000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) {
@@ -235,8 +254,39 @@ export default function Intelligence() {
           <div className="page__sub">
             LLM multipliers · Impact narrative · Extracted grid signals · Detected events
           </div>
+          {lastUpdated && <div className="page__sub">Last updated: {lastUpdated}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              loadIntelligence();
+            }}
+          >
+            Refresh /api/intelligence
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                await runIntelligence();
+                await loadIntelligence();
+              } catch (err) {
+                setError(`Generate intelligence failed: ${err.message || err}`);
+                setBusy(false);
+              }
+            }}
+          >
+            Run /api/generate-intelligence
+          </Button>
         </div>
       </div>
+      {error && <Card style={{ marginBottom: 12, padding: 12, color: 'var(--red)', fontSize: 12 }}>{error}</Card>}
       <div className="intel-grid">
         {Object.entries(data).map(([nodeId, nodeData]) => (
           <NodeIntelCard key={nodeId} nodeId={nodeId} data={nodeData} />

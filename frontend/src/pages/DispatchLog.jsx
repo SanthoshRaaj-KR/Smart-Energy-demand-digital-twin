@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchDispatchLog } from '../api';
-import { Card, SectionHeader, Skeleton, Badge } from '../components/Primitives';
+import { fetchDispatchLog, fetchSimulationResult, runSimulation } from '../api';
+import { Card, SectionHeader, Skeleton, Badge, Button } from '../components/Primitives';
 import './DispatchLog.css';
 
 function DispatchRow({ record, index }) {
@@ -103,9 +103,29 @@ function DispatchRow({ record, index }) {
 export default function DispatchLog() {
   const [records, setRecords] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
+  const [runLog, setRunLog] = useState([]);
+
+  const loadDispatchLog = async () => {
+    setError('');
+    try {
+      const d = await fetchDispatchLog();
+      setRecords(d);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      setError(`Dispatch log fetch failed: ${err.message || err}`);
+    } finally {
+      setLoading(false);
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
-    fetchDispatchLog().then((d) => { setRecords(d); setLoading(false); });
+    loadDispatchLog();
+    const id = setInterval(loadDispatchLog, 12000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) {
@@ -128,8 +148,60 @@ export default function DispatchLog() {
         <div>
           <div className="page__title">Dispatch Log</div>
           <div className="page__sub">All executed inter-city power transfers from the last clearing round</div>
+          {lastUpdated && <div className="page__sub">Last updated: {lastUpdated}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              loadDispatchLog();
+            }}
+          >
+            Refresh /api/dispatch-log
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              setRunLog([]);
+              try {
+                await runSimulation((line) => {
+                  setRunLog((prev) => {
+                    const next = [...prev, line];
+                    return next.length > 120 ? next.slice(next.length - 120) : next;
+                  });
+                });
+                const result = await fetchSimulationResult();
+                setRunLog((prev) => [...prev, `Latest result date: ${result.date || 'n/a'}`]);
+                await loadDispatchLog();
+              } catch (err) {
+                setError(`Run simulation failed: ${err.message || err}`);
+                setBusy(false);
+              }
+            }}
+          >
+            Run /api/run-simulation
+          </Button>
         </div>
       </div>
+      {error && <Card style={{ marginBottom: 12, padding: 12, color: 'var(--red)', fontSize: 12 }}>{error}</Card>}
+      {runLog.length > 0 && (
+        <Card style={{ marginBottom: 12 }}>
+          <SectionHeader title="Simulation Stream" subtitle={`${runLog.length} lines`} />
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '10px 14px', background: 'var(--bg-panel)' }}>
+            {runLog.map((line, i) => (
+              <div key={`${i}-${line.slice(0, 10)}`} className="mono" style={{ fontSize: 11, lineHeight: 1.55, color: 'var(--text)' }}>
+                <span style={{ color: 'var(--text-dim)', marginRight: 8 }}>{String(i + 1).padStart(2, '0')}</span>
+                {line}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Summary strip */}
       <div className="summary-strip" style={{ marginBottom: 16 }}>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchGridStatus } from '../api';
-import { Card, SectionHeader, Stat, Skeleton, Meter, Badge } from '../components/Primitives';
+import { fetchGridStatus, runIntelligence } from '../api';
+import { Card, SectionHeader, Stat, Skeleton, Meter, Badge, Button } from '../components/Primitives';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import './GridStatus.css';
 
@@ -118,9 +118,28 @@ function BalanceChart({ nodes }) {
 export default function GridStatus() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
+
+  const loadGridStatus = async () => {
+    setError('');
+    try {
+      const d = await fetchGridStatus();
+      setData(d);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      setError(`Grid status fetch failed: ${err.message || err}`);
+    } finally {
+      setLoading(false);
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
-    fetchGridStatus().then((d) => { setData(d); setLoading(false); });
+    loadGridStatus();
+    const id = setInterval(loadGridStatus, 12000);
+    return () => clearInterval(id);
   }, []);
 
   if (loading) {
@@ -145,8 +164,39 @@ export default function GridStatus() {
         <div>
           <div className="page__title">Grid Status</div>
           <div className="page__sub">Real-time node balances, battery SoC &amp; transmission congestion</div>
+          {lastUpdated && <div className="page__sub">Last updated: {lastUpdated}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              loadGridStatus();
+            }}
+          >
+            Refresh /api/grid-status
+          </Button>
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                await runIntelligence();
+                await loadGridStatus();
+              } catch (err) {
+                setError(`Generate intelligence failed: ${err.message || err}`);
+                setBusy(false);
+              }
+            }}
+          >
+            Run /api/generate-intelligence
+          </Button>
         </div>
       </div>
+      {error && <Card style={{ marginBottom: 12, padding: 12, color: 'var(--red)', fontSize: 12 }}>{error}</Card>}
 
       {/* Summary strip */}
       <div className="summary-strip">
