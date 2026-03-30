@@ -87,6 +87,22 @@ export default function IntelligencePage() {
           </div>
         </Card>
 
+        <Card>
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-white/5 border border-grid-border/40 flex items-center justify-center shrink-0">
+              <Brain className="w-4.5 h-4.5 text-cyan-400" />
+            </div>
+            <div className="flex-1">
+              <SectionLabel>Pipeline Interpretation Guide</SectionLabel>
+              <p className="text-xs text-grid-textDim leading-relaxed">
+                Each region card now shows all intelligence phases from data fetch to multiplier synthesis.
+                You can review baseline vs post-multiplier values, risk flags, vulnerable points, and path dependency signals.
+                Use the date chips inside each card to inspect day-specific weather details from cache.
+              </p>
+            </div>
+          </div>
+        </Card>
+
         {!loading && data && (
           <div className="flex flex-wrap gap-3">
             {REGIONS.map(region => {

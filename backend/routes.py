@@ -135,6 +135,27 @@ def _build_fallback_intelligence() -> Dict[str, Dict[str, Any]]:
             "detected_events": [],
             "impact_narrative": "(No intelligence generated yet)",
             "extracted_signals": "No signals available.",
+            "phase_trace": {
+                "phase_7": {
+                    "name": "Multiplier Synthesis",
+                    "status": "fallback",
+                    "before_multiplier": {
+                        "economic_demand_multiplier": 1.0,
+                        "generation_capacity_multiplier": 1.0,
+                        "temperature_anomaly": 0.0,
+                    },
+                    "after_multiplier": {
+                        "economic_demand_multiplier": 1.0,
+                        "generation_capacity_multiplier": 1.0,
+                        "temperature_anomaly": 0.0,
+                    },
+                    "flags": {
+                        "pre_event_hoard": False,
+                        "demand_spike_risk": "UNKNOWN",
+                        "supply_shortfall_risk": "UNKNOWN",
+                    },
+                }
+            },
             "weather": {
                 "current_temp_c": 30.0,
                 "current_humidity_pct": 60,
@@ -220,6 +241,7 @@ def intelligence():
             "extracted_signals": data.get("extracted_signals", ""),
             "weather": data.get("weather", {}),
             "city_intelligence": data.get("city_intelligence", {}),
+            "phase_trace": data.get("phase_trace", {}),
         }
     return result
 

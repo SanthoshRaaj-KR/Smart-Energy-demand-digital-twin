@@ -155,6 +155,7 @@ class NodeResult:
     extracted_signals   : str
     impact_narrative    : str
     grid_multipliers    : Optional[GridMultipliers]
+    phase_trace         : Optional[Dict[str, Any]] = None
     error               : Optional[str] = None
 
 

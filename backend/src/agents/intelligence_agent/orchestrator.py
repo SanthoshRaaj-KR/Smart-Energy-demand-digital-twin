@@ -54,6 +54,8 @@ from .signal_extractor_agent import SignalExtractorAgent
 from .impact_narrator_agent  import ImpactNarratorAgent
 from .multiplier_synth_agent import MultiplierSynthAgent
 
+BACKEND_DIR = Path(__file__).resolve().parents[3]
+
 
 class NodeOrchestrator:
     """
@@ -109,6 +111,97 @@ class NodeOrchestrator:
                 seen.add(key)
                 unique.append(h)
         return unique
+
+    @staticmethod
+    def _baseline_multipliers() -> Dict[str, Any]:
+        return {
+            "pre_event_hoard": False,
+            "temperature_anomaly": 0.0,
+            "economic_demand_multiplier": 1.0,
+            "generation_capacity_multiplier": 1.0,
+            "demand_spike_risk": "UNKNOWN",
+            "supply_shortfall_risk": "UNKNOWN",
+            "seven_day_demand_forecast_mw_delta": 0,
+            "confidence": 0.0,
+            "key_driver": "Baseline",
+            "reasoning": "Neutral defaults before multiplier synthesis.",
+        }
+
+    def _build_phase_trace(
+        self,
+        reg: Dict[str, Any],
+        weather: Optional[WeatherSummary],
+        all_headlines: List[str],
+        clean_headlines: List[str],
+        intel: Any,
+        detected_events: List[Any],
+        signals: str,
+        impact: str,
+        multipliers: Any,
+    ) -> Dict[str, Any]:
+        after_multiplier = asdict(multipliers)
+        before_multiplier = self._baseline_multipliers()
+        return {
+            "phase_1": {
+                "name": "Data Fetch",
+                "status": "completed",
+                "raw_headline_count": len(all_headlines),
+                "raw_headline_samples": all_headlines[:5],
+                "weather_snapshot": {
+                    "current_temp_c": weather.current_temp_c if weather else 0.0,
+                    "week_max_c": weather.week_max_c if weather else 0.0,
+                    "week_total_rain_mm": weather.week_total_rain_mm if weather else 0.0,
+                },
+            },
+            "phase_2": {
+                "name": "City Intelligence Profile",
+                "status": "completed",
+                "llm_confidence": float(getattr(intel, "llm_confidence", 0.0)),
+                "key_vulnerabilities": list(getattr(intel, "key_vulnerabilities", [])[:6]),
+                "primary_fuel_sources": list(getattr(intel, "primary_fuel_sources", [])[:6]),
+                "fuel_supply_routes": list(getattr(intel, "fuel_supply_routes", [])[:6]),
+                "neighboring_exchange": list(getattr(intel, "neighboring_exchange", [])[:6]),
+            },
+            "phase_3": {
+                "name": "Event Radar",
+                "status": "completed",
+                "event_count": len(detected_events),
+                "events": [asdict(e) for e in detected_events],
+            },
+            "phase_4": {
+                "name": "Headline Filtering",
+                "status": "completed",
+                "input_count": len(all_headlines),
+                "output_count": len(clean_headlines),
+                "retained_samples": clean_headlines[:5],
+            },
+            "phase_5": {
+                "name": "Signal Extraction",
+                "status": "completed",
+                "summary": signals,
+            },
+            "phase_6": {
+                "name": "Impact Narrative",
+                "status": "completed",
+                "narrative": impact,
+            },
+            "phase_7": {
+                "name": "Multiplier Synthesis",
+                "status": "completed",
+                "before_multiplier": before_multiplier,
+                "after_multiplier": after_multiplier,
+                "flags": {
+                    "pre_event_hoard": bool(after_multiplier.get("pre_event_hoard", False)),
+                    "demand_spike_risk": after_multiplier.get("demand_spike_risk", "UNKNOWN"),
+                    "supply_shortfall_risk": after_multiplier.get("supply_shortfall_risk", "UNKNOWN"),
+                },
+                "path_dependency_signals": {
+                    "fuel_supply_routes": list(getattr(intel, "fuel_supply_routes", [])[:6]),
+                    "neighboring_exchange": list(getattr(intel, "neighboring_exchange", [])[:6]),
+                    "regional_state": reg.get("state", ""),
+                },
+            },
+        }
 
     def run(self, node_id: str) -> NodeResult:
         reg  = CITY_REGISTRY[node_id]
@@ -212,6 +305,18 @@ class NodeOrchestrator:
             f"S-Risk={multipliers.supply_shortfall_risk}"
         )
 
+        phase_trace = self._build_phase_trace(
+            reg=reg,
+            weather=weather,
+            all_headlines=all_headlines,
+            clean_headlines=clean_headlines,
+            intel=intel,
+            detected_events=detected_events,
+            signals=signals,
+            impact=impact,
+            multipliers=multipliers,
+        )
+
         return NodeResult(
             node_id           = node_id,
             city              = city,
@@ -222,6 +327,7 @@ class NodeOrchestrator:
             extracted_signals = signals,
             impact_narrative  = impact,
             grid_multipliers  = multipliers,
+            phase_trace       = phase_trace,
         )
 
 
@@ -249,7 +355,8 @@ class SmartGridIntelligenceAgent:
             )
 
         self._today_str = date.today().isoformat()
-        self._cache_dir = Path("outputs") / "context_cache"
+        self._outputs_dir = BACKEND_DIR / "outputs"
+        self._cache_dir = self._outputs_dir / "context_cache"
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
         self._dump_path = self._cache_dir / f"raw_api_dump_{self._today_str}.txt"
@@ -277,11 +384,14 @@ class SmartGridIntelligenceAgent:
         p = self._daily_cache_path(node_id)
         if p.exists():
             print(f"  [CACHE] Daily result cached for {node_id} — loading.")
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8"))
         return None
 
     def _save_daily_cache(self, node_id: str, data: Dict) -> None:
-        self._daily_cache_path(node_id).write_text(json.dumps(data, indent=2))
+        self._daily_cache_path(node_id).write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
     @staticmethod
     def _result_to_dict(r: NodeResult) -> Dict[str, Any]:
@@ -296,6 +406,7 @@ class SmartGridIntelligenceAgent:
             "extracted_signals": r.extracted_signals,
             "impact_narrative" : r.impact_narrative,
             "grid_multipliers" : asdict(r.grid_multipliers) if r.grid_multipliers else None,
+            "phase_trace"      : r.phase_trace or {},
         }
 
     def run_all_regions(self) -> Dict[str, Dict]:
