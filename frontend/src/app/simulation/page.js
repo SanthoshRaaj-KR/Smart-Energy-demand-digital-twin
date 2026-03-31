@@ -146,35 +146,54 @@ export default function SimulationPage() {
                 className="h-96 md:h-[500px]"
                 nodes={gridStatus?.nodes || []}
                 edges={edges}
+                dispatches={results?.dispatches || []}
               />
             </Card>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {topCongested.map((line, index) => {
                 const congestion = Math.round(Number(line.congestion || 0) * 100)
-                const color = congestion > 80 ? '#ef4444' : congestion > 60 ? '#f59e0b' : '#00d4ff'
+                const flow = Number(line.flow_mw || 0).toFixed(0)
+                const capacity = Number(line.capacity_mw || 5000).toFixed(0)
+                const color = congestion > 80 ? '#ef4444' : congestion > 60 ? '#f59e0b' : '#22d3ee'
+                
                 return (
                   <div key={`${line.src}-${line.dst}-${index}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/3 border border-grid-border/40">
-                    <span className="text-xs text-white"
-                      style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-                      {line.src}-{line.dst}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1 rounded-full bg-grid-border/50">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${congestion}%`,
-                            background: color,
-                            boxShadow: `0 0 6px ${color}88`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium w-8 text-right"
-                        style={{ color, fontFamily: 'IBM Plex Mono, monospace' }}>
-                        {congestion}%
-                      </span>
+                    className="group relative overflow-hidden p-4 rounded-xl bg-black/40 border border-grid-border/30 hover:border-cyan-500/40 transition-all transition-shadow duration-300 hover:shadow-[0_4px_20px_rgba(34,211,238,0.15)]">
+                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                       <Network className="w-10 h-10 text-cyan-400" />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mb-3">
+                       <span className="text-[10px] font-bold text-white px-2 py-0.5 bg-white/5 rounded border border-white/10 uppercase font-mono tracking-tighter">
+                          {line.src} → {line.dst}
+                       </span>
+                       <Badge variant={congestion > 80 ? 'red' : 'cyan'}>
+                          {congestion > 80 ? 'CRITICAL' : 'SAT_NORMAL'}
+                       </Badge>
+                    </div>
+
+                    <div className="flex justify-between items-end mb-2">
+                       <div className="flex flex-col">
+                          <span className="text-[9px] text-grid-textDim uppercase font-mono">Net Transfer / Total Capacity</span>
+                          <span className="text-sm font-bold text-grid-text" style={{ fontFamily: 'IBM Plex Mono' }}>
+                            {flow} <span className="text-[10px] opacity-40">/</span> {capacity} <span className="text-[10px] opacity-40 italic">MW</span>
+                          </span>
+                       </div>
+                       <span className="text-lg font-black tracking-tighter" style={{ color, fontFamily: 'Rajdhani, sans-serif' }}>
+                          {congestion}%
+                       </span>
+                    </div>
+
+                    <div className="h-1.5 rounded-full bg-white/5 border border-white/5 overflow-hidden p-0.25">
+                       <div className="h-full rounded-full transition-all duration-1000 relative"
+                         style={{
+                           width: `${congestion}%`,
+                           background: color,
+                           boxShadow: `0 0 10px ${color}66`,
+                         }}>
+                         {congestion > 70 && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
+                       </div>
                     </div>
                   </div>
                 )

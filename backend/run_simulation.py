@@ -133,7 +133,7 @@ class GridEnvAdapter:
 def run_battery_phase(env: GridEnvironment) -> Dict[str, str]:
     actions: Dict[str, str] = {}
     for nid, node in env.nodes.items():
-        bal = node.raw_balance_mw
+        bal = node.residual_balance_mw
         if node.battery is None:
             actions[nid] = f"No battery. Balance {bal:+.2f} MW"
             continue
@@ -408,6 +408,7 @@ def write_simulation_result(
             "generation_mw": round(node.generation_mw, 3),
             "demand_mw": round(node.adjusted_demand_mw, 3),
             "balance_mw": round(node.raw_balance_mw, 3),
+            "net_trade_mw": round(node.net_trade_mw, 3),
             "battery_soc": round(node.battery.soc, 4) if node.battery else None,
         }
 

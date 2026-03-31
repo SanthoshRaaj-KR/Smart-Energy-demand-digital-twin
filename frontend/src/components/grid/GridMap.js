@@ -6,7 +6,7 @@ function pct(val, max) {
   return (val / 100) * max
 }
 
-export function GridMap({ animated = false, highlight = null, className = '', nodes = [], edges = [] }) {
+export function GridMap({ animated = false, highlight = null, className = '', nodes = [], edges = [], dispatches = [] }) {
   const [flowOffset, setFlowOffset] = useState(0)
   const [pulseNodes, setPulseNodes] = useState([])
 
@@ -28,14 +28,25 @@ export function GridMap({ animated = false, highlight = null, className = '', no
     [nodes]
   )
 
+  // Memoize active transfers indexed by edge key for fast lookup
+  const activeTransfers = useMemo(() => {
+    const map = {}
+    dispatches.forEach(d => {
+      const key = `${d.seller_city_id}-${d.buyer_city_id}`
+      map[key] = (map[key] || 0) + Number(d.transfer_mw || 0)
+    })
+    return map
+  }, [dispatches])
+
   const getNodePos = (id) => {
     const region = REGION_BY_ID[id]
     if (!region) return { x: W / 2, y: H / 2 }
     return { x: pct(region.x, W), y: pct(region.y, H) }
   }
 
-  const getCongestionColor = (congestionPct) => {
+  const getCongestionColor = (congestionPct, hasTransfer) => {
     if (congestionPct > 80) return '#ef4444'
+    if (hasTransfer) return '#22d3ee' // Cyan/Blue for active trade
     if (congestionPct > 60) return '#f59e0b'
     return '#00d4ff'
   }
@@ -56,6 +67,10 @@ export function GridMap({ animated = false, highlight = null, className = '', no
         <defs>
           <filter id="glow-cyan">
             <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="glow-transfer">
+            <feGaussianBlur stdDeviation="5" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
           <filter id="glow-red">
@@ -84,9 +99,16 @@ export function GridMap({ animated = false, highlight = null, className = '', no
         {(edges || []).map((edge, i) => {
           const from = getNodePos(edge.src)
           const to = getNodePos(edge.dst)
+          
+          // Check for active transfer
+          const transferMW = activeTransfers[`${edge.src}-${edge.dst}`] || 0
+          const hasTransfer = transferMW > 0
+          
           const congestionPct = Math.round((Number(edge.congestion || 0) * 100))
-          const color = getCongestionColor(congestionPct)
+          const color = getCongestionColor(congestionPct, hasTransfer)
           const isCongested = congestionPct > 80
+          
+          // Calculate curve
           const midX = (from.x + to.x) / 2 + (i % 2 === 0 ? 15 : -15)
           const midY = (from.y + to.y) / 2 + (i % 2 === 0 ? -15 : 15)
           const d = `M ${from.x} ${from.y} Q ${midX} ${midY} ${to.x} ${to.y}`
@@ -97,51 +119,64 @@ export function GridMap({ animated = false, highlight = null, className = '', no
                 d={d}
                 fill="none"
                 stroke={color}
-                strokeWidth={isCongested ? 6 : 3}
-                opacity={0.08}
-                filter={isCongested ? 'url(#glow-red)' : undefined}
+                strokeWidth={isCongested ? 7 : hasTransfer ? 5 : 3}
+                opacity={hasTransfer ? 0.25 : 0.08}
+                filter={isCongested ? 'url(#glow-red)' : hasTransfer ? 'url(#glow-transfer)' : undefined}
               />
               <path
                 d={d}
                 fill="none"
                 stroke={color}
-                strokeWidth={isCongested ? 2.5 : 1.5}
-                opacity={isCongested ? 0.9 : 0.6}
+                strokeWidth={isCongested ? 2.5 : hasTransfer ? 2.0 : 1.5}
+                opacity={isCongested ? 0.9 : hasTransfer ? 1.0 : 0.6}
               />
-              {animated && (
+              
+              {(animated || hasTransfer) && (
                 <path
                   d={d}
                   fill="none"
-                  stroke={color}
-                  strokeWidth={2}
-                  opacity={0.9}
-                  strokeDasharray="6 8"
-                  strokeDashoffset={-flowOffset}
-                  style={{ filter: `drop-shadow(0 0 3px ${color})` }}
+                  stroke={hasTransfer ? '#fff' : color}
+                  strokeWidth={hasTransfer ? 2.5 : 2}
+                  opacity={hasTransfer ? 1.0 : 0.9}
+                  strokeDasharray={hasTransfer ? "8 12" : "6 8"}
+                  strokeDashoffset={-flowOffset * (hasTransfer ? 2 : 1)}
+                  style={{ filter: `drop-shadow(0 0 5px ${color})` }}
                 />
               )}
-              <text
-                x={midX}
-                y={midY - 4}
-                fill={color}
-                fontSize="9"
-                textAnchor="middle"
-                fontFamily="IBM Plex Mono"
-                opacity={0.8}
-              >
-                {congestionPct}%
-              </text>
+
+              {/* Congestion / Transfer Label */}
+              <g transform={`translate(${midX}, ${midY})`}>
+                <rect 
+                  x="-25" y="-14" width="50" height="12" rx="4"
+                  fill="rgba(7,16,26,0.9)" 
+                  stroke={color} 
+                  strokeWidth="0.5" 
+                  opacity="0.9"
+                />
+                <text
+                  y="-5"
+                  fill={color}
+                  fontSize="8"
+                  textAnchor="middle"
+                  fontFamily="IBM Plex Mono"
+                  fontWeight="bold"
+                >
+                  {hasTransfer ? `${transferMW.toFixed(0)} MW` : `${congestionPct}%`}
+                </text>
+              </g>
+
               {isCongested && (
                 <text
                   x={midX}
-                  y={midY + 8}
+                  y={midY + 12}
                   fill="#ef4444"
                   fontSize="8"
                   textAnchor="middle"
                   fontFamily="IBM Plex Mono"
                   opacity={0.9}
+                  fontWeight="black"
                 >
-                  WARN
+                  CRITICAL_SAT
                 </text>
               )}
             </g>

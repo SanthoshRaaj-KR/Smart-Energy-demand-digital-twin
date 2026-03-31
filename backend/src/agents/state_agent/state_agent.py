@@ -134,24 +134,24 @@ class StateAgent:
 
         phase_log = [
             (
-                f"PHASE_1_CALIBRATION state={self.city_id} avg_forecast={avg_forecast:.2f} "
-                f"safety_buffer={safety_buffer:.2f} baseline_supply={baseline_supply:.2f}"
+                f"CALIBRATION | Baseline set to {baseline_supply:.0f} MW | "
+                f"avg_forecast={avg_forecast:.2f} safety_buffer={safety_buffer:.2f}"
             ),
             (
-                f"PHASE_2_INTELLIGENCE state={self.city_id} today_forecast={todays_demand_forecast_mw:.2f} "
-                f"economic_demand_multiplier={edm:.3f} generation_multiplier={gmm:.3f} "
-                f"adjusted_demand={adjusted_demand:.2f} adjusted_supply={adjusted_supply:.2f} "
-                f"net={net:.2f} deficit={deficit:.2f} surplus={surplus:.2f}"
+                f"AUDIT | Net position: {net:+.1f} MW | "
+                f"demand_adj={edm:.3f} supply_adj={gmm:.3f} "
+                f"deficit={deficit:.1f} surplus={surplus:.1f}"
             ),
             (
-                f"PHASE_2_TEMPORAL state={self.city_id} pre_event_hoard={pre_event_hoard} "
-                f"dispatch_hour_hint={dispatch_hour_hint:02d}:00"
+                f"TEMPORAL | Dispatch window: {dispatch_hour_hint:02d}:00 | "
+                f"pre_event_hoard={pre_event_hoard}"
             ),
         ]
 
         if future_hoard_triggered:
             phase_log.append(
-                f"SELF-PRESERVATION state={self.city_id} hoarding for Day {hoard_day} deficit={future_deficit_mw:.2f} MW. Surplus retained."
+                f"SELF-PRESERVATION | Hoarding for Day {hoard_day} | "
+                f"future_deficit={future_deficit_mw:.1f} MW. Surplus retained for local security."
             )
             intelligence["pre_event_hoard"] = True
             intelligence["hoard_day"] = hoard_day
@@ -187,14 +187,13 @@ class StateAgent:
         """
         if role.upper() == "BUYER":
             return (
-                f"{self.city_id} requests {state_position.deficit_mw:.2f} MW from {counterparty}; "
-                f"intelligence-adjusted deficit is {state_position.deficit_mw:.2f} MW, "
-                f"request window {state_position.dispatch_hour_hint:02d}:00, "
-                f"accepting dispatcher cap up to {hard_cap_mw:.2f} MW."
+                f"REQUEST | {self.city_id} buying {state_position.deficit_mw:.1f} MW | "
+                f"deficit_risk={self.demand_spike_risk.value} dispatch_window={state_position.dispatch_hour_hint:02d}:00 "
+                f"dispatcher_cap={hard_cap_mw:.1f} MW"
             )
         return (
-            f"{self.city_id} can offer capped transfer of {hard_cap_mw:.2f} MW to {counterparty}; "
-            f"available surplus is {state_position.surplus_mw:.2f} MW under current constraints."
+            f"OFFER | {self.city_id} selling {hard_cap_mw:.1f} MW | "
+            f"available_surplus={state_position.surplus_mw:.1f} MW under current constraint"
         )
 
     # ------------------------------------------------------------------

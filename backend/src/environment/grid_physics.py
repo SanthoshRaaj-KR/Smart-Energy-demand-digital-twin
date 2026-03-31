@@ -123,11 +123,17 @@ class RegionNode:
     # set each day by simulation
     demand_mw     : float = 0.0
     adjusted_demand_mw: float = 0.0   # after context agent adjusts
+    net_trade_mw  : float = 0.0       # positive = import, negative = export
 
     @property
     def raw_balance_mw(self) -> float:
-        """Positive = surplus, Negative = deficit. Before battery."""
+        """Positive = surplus, Negative = deficit. Before battery and trade."""
         return self.generation_mw - self.adjusted_demand_mw
+
+    @property
+    def residual_balance_mw(self) -> float:
+        """Surplus/Deficit remaining AFTER market trades, but BEFORE battery."""
+        return self.raw_balance_mw + self.net_trade_mw
 
     def __repr__(self):
         bal = self.raw_balance_mw
@@ -427,19 +433,25 @@ class GridEnvironment:
     # ── congestion management ─────────────────
 
     def reset_flows(self):
-        """Clear all edge flows at start of each timestep."""
+        """Clear all edge flows and node trade balances at start of each timestep."""
         for edge in self.edges.values():
             edge.reset_flow()
+        for node in self.nodes.values():
+            node.net_trade_mw = 0.0
 
     def apply_flow(self, path: TransmissionPath, flow_mw: float) -> float:
         """
         Push flow_mw through all edges of a path.
         Returns energy delivered at destination (after compound loss).
-        Raises if any edge is overloaded.
+        Updates node.net_trade_mw for source and destination.
         """
+        self.nodes[path.src].net_trade_mw -= flow_mw
+        
         delivered = flow_mw
         for key in path.edge_keys:
             delivered = self.edges[key].push_flow(delivered)
+            
+        self.nodes[path.dst].net_trade_mw += delivered
         return delivered
 
     def get_paths_for(self, src: str, dst: str) -> List[TransmissionPath]:

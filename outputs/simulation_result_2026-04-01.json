@@ -1,35 +1,35 @@
 {
-  "date": "2026-03-31",
+  "date": "2026-04-01",
   "dispatches": [],
   "load_shedding": [],
   "decision_log": [],
   "xai_log": [],
   "phase_logs": {
     "BHR": [
-      "PHASE_1_CALIBRATION state=BHR avg_forecast=10037.12 safety_buffer=1.05 baseline_supply=10538.98",
-      "PHASE_2_INTELLIGENCE state=BHR today_forecast=10037.12 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=10037.12 adjusted_supply=10538.98 net=501.86 deficit=0.00 surplus=501.86",
-      "PHASE_2_TEMPORAL state=BHR pre_event_hoard=False dispatch_hour_hint=14:00"
+      "CALIBRATION | Baseline set to 10539 MW | avg_forecast=10037.12 safety_buffer=1.05",
+      "AUDIT | Net position: +501.9 MW | demand_adj=1.000 supply_adj=1.000 deficit=0.0 surplus=501.9",
+      "TEMPORAL | Dispatch window: 14:00 | pre_event_hoard=False"
     ],
     "UP": [
-      "PHASE_1_CALIBRATION state=UP avg_forecast=15504.66 safety_buffer=1.05 baseline_supply=16279.89",
-      "PHASE_2_INTELLIGENCE state=UP today_forecast=14970.01 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=14970.01 adjusted_supply=16279.89 net=0.00 deficit=0.00 surplus=0.00",
-      "PHASE_2_TEMPORAL state=UP pre_event_hoard=True dispatch_hour_hint=03:00",
-      "SELF-PRESERVATION state=UP hoarding for Day 2 deficit=2432.63 MW. Surplus retained.",
+      "CALIBRATION | Baseline set to 16280 MW | avg_forecast=15504.66 safety_buffer=1.05",
+      "AUDIT | Net position: +0.0 MW | demand_adj=1.000 supply_adj=1.000 deficit=0.0 surplus=0.0",
+      "TEMPORAL | Dispatch window: 03:00 | pre_event_hoard=True",
+      "SELF-PRESERVATION | Hoarding for Day 2 | future_deficit=2432.6 MW. Surplus retained for local security.",
       "RAMPING: Baseload Thermal Spin-Up for Day 2 Event"
     ],
     "WB": [
-      "PHASE_1_CALIBRATION state=WB avg_forecast=13062.75 safety_buffer=1.05 baseline_supply=13715.89",
-      "PHASE_2_INTELLIGENCE state=WB today_forecast=13062.75 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=13062.75 adjusted_supply=13715.89 net=653.14 deficit=0.00 surplus=653.14",
-      "PHASE_2_TEMPORAL state=WB pre_event_hoard=False dispatch_hour_hint=14:00"
+      "CALIBRATION | Baseline set to 13716 MW | avg_forecast=13062.75 safety_buffer=1.05",
+      "AUDIT | Net position: +653.1 MW | demand_adj=1.000 supply_adj=1.000 deficit=0.0 surplus=653.1",
+      "TEMPORAL | Dispatch window: 14:00 | pre_event_hoard=False"
     ],
     "KAR": [
-      "PHASE_1_CALIBRATION state=KAR avg_forecast=13258.40 safety_buffer=1.05 baseline_supply=13921.32",
-      "PHASE_2_INTELLIGENCE state=KAR today_forecast=13258.40 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=13258.40 adjusted_supply=13921.32 net=662.92 deficit=0.00 surplus=662.92",
-      "PHASE_2_TEMPORAL state=KAR pre_event_hoard=False dispatch_hour_hint=14:00"
+      "CALIBRATION | Baseline set to 13921 MW | avg_forecast=13258.40 safety_buffer=1.05",
+      "AUDIT | Net position: +662.9 MW | demand_adj=1.000 supply_adj=1.000 deficit=0.0 surplus=662.9",
+      "TEMPORAL | Dispatch window: 14:00 | pre_event_hoard=False"
     ]
   },
   "settlement_ledger": {
-    "date": "2026-03-31",
+    "date": "2026-04-01",
     "states": {
       "BHR": {
         "generation_mw": 10538.978820183971,

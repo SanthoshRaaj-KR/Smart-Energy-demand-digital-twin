@@ -153,12 +153,12 @@ class RoutingAgent:
 
                 # Phase 4: deterministic LLM-style negotiation transcript
                 buyer_line = (
-                    f"{buyer.city_id}: critical deficit {buyer.remaining_mw:.2f} MW, "
-                    f"requesting immediate transfer in off-peak window."
+                    f"NEGOTIATE | {buyer.city_id} buying {buyer.remaining_mw:.1f} MW | "
+                    f"critical_shortfall requiring immediate transfer"
                 )
                 seller_line = (
-                    f"{seller.city_id}: can offer up to dispatcher cap "
-                    f"{gate['line_cap_mw']:.2f} MW under thermal limits."
+                    f"NEGOTIATE | {seller.city_id} offering capped flow | "
+                    f"dispatcher_limit={gate['line_cap_mw']:.1f} MW under thermal corridor limits"
                 )
                 self._decision_log.append(
                     {
@@ -246,12 +246,16 @@ class RoutingAgent:
                 cleared_price = float(seller.price_per_mw) + path_cost + carbon_tax
 
                 trace = [
-                    gate.get("log", ""),
-                    f"NEGOTIATION buyer='{buyer_line}' seller='{seller_line}'",
-                    f"ROUTE_AGENT DOUBLE_DQN_PROXY score={route_score:.4f}",
-                    *route_trace,
-                    f"SYNDICATE {decider['reason']}",
-                    f"SAFETY {safe_reason}",
+                    f"GATE | {gate.get('reason', 'Thermal corridor check')} | "
+                    f"line_cap={gate['line_cap_mw']:.1f} MW dlr_applied={gate['dlr_applied']}",
+                    buyer_line,
+                    seller_line,
+                    f"ROUTE | Score: {route_score:.4f} | "
+                    f"dqn_proxy_trace={','.join(route_trace[:2])}",
+                    f"SYNDICATE | {decider['reason']} | "
+                    f"approved_mw={decider['approved_mw']:.1f}",
+                    f"SAFETY | {safe_reason} | "
+                    f"path_validation_done",
                 ]
 
                 record = DispatchRecord(
