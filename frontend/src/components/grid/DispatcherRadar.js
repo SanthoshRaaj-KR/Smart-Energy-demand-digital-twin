@@ -20,80 +20,120 @@ export function DispatcherRadar({ results }) {
   const isLocked = radarAlerts.length > 0
 
   return (
-    <Card className="relative overflow-hidden bg-[#0a1219] border-grid-border/40">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-bold text-white tracking-widest uppercase" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-            Intra-Day Dispatch Radar
-          </h3>
+    <Card className="relative overflow-hidden bg-gradient-to-br from-[#0a1219] to-[#050810] border-grid-border/40">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-cyan-500/10">
+            <Clock className="w-5 h-5 text-cyan-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-white tracking-wide" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+              24-Hour Dispatch Timeline
+            </h3>
+            <p className="text-[10px] text-grid-textDim uppercase tracking-wider">
+              Dynamic Line Rating Schedule
+            </p>
+          </div>
         </div>
         {isLocked && (
-          <div className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/30 rounded">
-            <ShieldAlert className="w-3 h-3 text-red-500 animate-pulse" />
-            <span className="text-[10px] text-red-400 font-bold uppercase tracking-tighter" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-              Corridor Lock Active
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/15 border border-red-500/40 rounded-lg">
+            <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse" />
+            <span className="text-xs text-red-400 font-bold uppercase tracking-wider" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+              Thermal Lock
             </span>
           </div>
         )}
       </div>
 
-      {/* 24-Hour Timeline Strip */}
-      <div className="relative h-16 w-full bg-black/40 rounded border border-grid-border/20 flex mb-4">
-        {[...Array(24)].map((_, i) => {
-          const hour = i;
-          const isBlocked = isLocked && hour >= 12 && hour <= 16;
-          const isMorningSafe = isLocked && hour >= 4 && hour <= 8;
-          
-          return (
-            <div 
-              key={i} 
-              className={`flex-1 border-r border-grid-border/10 flex flex-col justify-end items-center pb-1 relative
-                ${isBlocked ? 'bg-red-500/20' : ''}
-                ${isMorningSafe ? 'bg-green-500/10' : ''}
-              `}
-            >
-              {isBlocked && (
-                <div className="absolute inset-0 opacity-30" 
-                  style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(239, 68, 68, 0.5) 5px, rgba(239, 68, 68, 0.5) 10px)' }} 
-                />
-              )}
-              <span className={`text-[8px] font-medium ${isBlocked ? 'text-red-400' : 'text-grid-textDim'}`} style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-                {String(hour).padStart(2, '0')}
-              </span>
-              {i % 4 === 0 && (
-                <div className="w-px h-2 bg-grid-border/40 absolute -top-1" />
-              )}
-            </div>
-          )
-        })}
+      {/* Enhanced 24-Hour Timeline */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] text-grid-textDim uppercase tracking-wider">Hour of Day</span>
+          <div className="flex items-center gap-4 text-[9px] text-grid-textDim">
+            {isLocked && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-green-500/30 border border-green-500/50" />
+                  <span>Safe Window</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-red-500/30 border border-red-500/50" />
+                  <span>Blocked</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="relative h-20 w-full bg-black/40 rounded-lg border border-grid-border/30 flex overflow-hidden">
+          {[...Array(24)].map((_, i) => {
+            const hour = i;
+            const isBlocked = isLocked && hour >= 12 && hour <= 16;
+            const isMorningSafe = isLocked && hour >= 4 && hour <= 8;
+            
+            return (
+              <div 
+                key={i} 
+                className={`flex-1 border-r border-grid-border/10 flex flex-col justify-between items-center py-2 relative transition-all duration-300
+                  ${isBlocked ? 'bg-red-500/25' : ''}
+                  ${isMorningSafe ? 'bg-green-500/15' : ''}
+                `}
+              >
+                {/* Diagonal stripes for blocked hours */}
+                {isBlocked && (
+                  <div className="absolute inset-0 opacity-40" 
+                    style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(239, 68, 68, 0.6) 5px, rgba(239, 68, 68, 0.6) 10px)' }} 
+                  />
+                )}
+                
+                {/* Hour indicator bars */}
+                <div className={`w-full flex-1 flex items-end justify-center ${isBlocked ? 'opacity-50' : ''}`}>
+                  {i % 4 === 0 && (
+                    <div className={`w-0.5 h-full ${isBlocked ? 'bg-red-500/60' : isMorningSafe ? 'bg-green-500/60' : 'bg-grid-border/40'}`} />
+                  )}
+                </div>
+                
+                {/* Hour label */}
+                <span className={`text-[9px] font-bold relative z-10 ${isBlocked ? 'text-red-400' : isMorningSafe ? 'text-green-400' : 'text-grid-textDim'}`} 
+                  style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+                  {String(hour).padStart(2, '0')}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Large Pulsing Alert Overlay/Footer */}
+      {/* Status Message */}
       {isLocked ? (
-        <div className="p-3 bg-red-950/30 rounded-lg border border-red-900/40 relative animate-pulse">
-           <div className="flex items-start gap-3">
-              <div className="p-2 bg-red-600/20 rounded-full">
-                 <ShieldAlert className="w-5 h-5 text-red-500" />
+        <div className="p-4 bg-red-950/40 rounded-lg border border-red-900/50 relative">
+           <div className="flex items-start gap-4">
+              <div className="p-3 bg-red-600/20 rounded-lg shrink-0">
+                 <ShieldAlert className="w-6 h-6 text-red-500" />
               </div>
               <div className="flex-1">
-                 <div className="text-xs font-bold text-red-400 uppercase mb-1 tracking-wider">Dispatcher System Warning</div>
-                 <div className="text-sm text-white font-medium bg-red-600/10 p-2 rounded border border-red-500/20">
-                    ⚠️ DISPATCHER ALERT: Afternoon DLR Collapse. ALL TRANSFERS FORCED TO 04:00 - 08:00 HRS.
+                 <div className="text-sm font-bold text-red-400 uppercase mb-2 tracking-wide">
+                   ⚡ Thermal Capacity Alert
                  </div>
-                 <div className="mt-2 text-[10px] text-grid-textDim italic">
-                   Visualizing why RL Double DQN shifted loads to morning window due to predicted {radarAlerts[0].seller}-{radarAlerts[0].buyer} thermal lockout.
+                 <div className="text-sm text-white/90 leading-relaxed mb-3 p-3 rounded-lg bg-red-600/10 border border-red-500/30">
+                    High afternoon temperatures causing Dynamic Line Rating collapse. All power transfers automatically rescheduled to 04:00 - 08:00 morning window for grid safety.
+                 </div>
+                 <div className="text-[10px] text-grid-textDim/80 italic leading-relaxed">
+                   System prevented thermal overload on {radarAlerts[0]?.seller || 'multi'}-{radarAlerts[0]?.buyer || 'state'} corridor by shifting dispatch timing.
                  </div>
               </div>
            </div>
         </div>
       ) : (
-        <div className="p-3 bg-cyan-950/20 rounded-lg border border-cyan-900/20">
+        <div className="p-4 bg-cyan-950/20 rounded-lg border border-cyan-900/30">
            <div className="flex items-center gap-3">
-              <Zap className="w-4 h-4 text-cyan-400" />
-              <span className="text-[11px] text-grid-textDim uppercase tracking-widest" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-                All corridors nominal. DLR limits operational.
-              </span>
+              <Zap className="w-5 h-5 text-cyan-400" />
+              <div>
+                <span className="text-sm text-white font-medium block mb-0.5">All Systems Operational</span>
+                <span className="text-[10px] text-grid-textDim uppercase tracking-widest" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+                  DLR limits nominal • Full 24-hour dispatch available
+                </span>
+              </div>
            </div>
         </div>
       )}

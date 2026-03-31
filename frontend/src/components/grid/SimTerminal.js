@@ -77,49 +77,59 @@ export function SimTerminal({ logs, running, done, onRun }) {
 
       {/* Terminal body */}
       <div
-        className="h-96 overflow-y-auto p-4 space-y-1 font-mono text-xs"
+        className="h-96 overflow-y-auto p-4 space-y-0.5 font-mono text-xs"
         style={{ background: 'rgba(3,5,8,0.95)', fontFamily: 'IBM Plex Mono, monospace' }}
       >
         {isEmpty && !running && (
-          <div className="flex items-center gap-2 text-grid-textDim/50 py-8 justify-center">
-            <Terminal className="w-4 h-4" />
-            <span>Click "Run Sim" to start the agentic simulation</span>
+          <div className="flex flex-col items-center gap-3 text-grid-textDim/50 py-12 justify-center">
+            <Terminal className="w-8 h-8" />
+            <span className="text-sm">Click "Run Sim" to start the agentic simulation</span>
+            <span className="text-[10px] text-grid-textDim/30">Live logs will stream here</span>
           </div>
         )}
 
-        {/* Logs */}
+        {/* Logs with improved spacing */}
         {logs.map((log, i) => {
           const agentDef = AGENT_COLORS[log.agent] || AGENT_COLORS.STREAM
           const isLast = i === logs.length - 1
           const isDone = log.text?.includes('SIMULATION COMPLETE')
+          const isPhaseHeader = log.text?.includes('PHASE') || log.text?.includes('=====')
 
           return (
             <div
               key={i}
-              className="flex items-start gap-2 py-0.5 px-2 rounded"
+              className={`flex items-start gap-2.5 py-1.5 px-3 rounded ${isPhaseHeader ? 'mt-2' : ''}`}
               style={{
-                background: isDone ? 'rgba(16,185,129,0.06)' : agentDef.bg,
-                borderLeft: `2px solid ${agentDef.color}33`,
+                background: isDone 
+                  ? 'rgba(16,185,129,0.1)' 
+                  : isPhaseHeader 
+                  ? 'rgba(0,212,255,0.05)' 
+                  : agentDef.bg,
+                borderLeft: `2px solid ${agentDef.color}40`,
                 animation: isLast ? 'count-up 0.2s ease-out' : 'none',
               }}
             >
-              {/* Agent badge */}
+              {/* Agent badge - improved visibility */}
               <span
-                className="text-[9px] px-1.5 py-0.5 rounded shrink-0 mt-0.5 font-bold tracking-wider"
+                className="text-[9px] px-2 py-1 rounded shrink-0 mt-0.5 font-bold tracking-wider"
                 style={{
-                  background: `${agentDef.color}15`,
+                  background: `${agentDef.color}20`,
                   color: agentDef.color,
-                  border: `1px solid ${agentDef.color}30`,
+                  border: `1px solid ${agentDef.color}40`,
+                  minWidth: '50px',
+                  textAlign: 'center'
                 }}
               >
                 {agentDef.label}
               </span>
 
-              {/* Text */}
+              {/* Text with better contrast */}
               <span
-                className={`leading-relaxed ${
+                className={`leading-relaxed flex-1 ${
                   isDone
-                    ? 'text-green-400 font-medium'
+                    ? 'text-green-400 font-bold'
+                    : isPhaseHeader
+                    ? 'text-cyan-300 font-semibold'
                     : log.agent === 'SYSTEM'
                     ? 'text-grid-textDim'
                     : 'text-grid-text'
@@ -133,9 +143,9 @@ export function SimTerminal({ logs, running, done, onRun }) {
 
         {/* Cursor */}
         {running && (
-          <div className="flex items-center gap-1 text-cyan-400 px-2">
-            <span>$</span>
-            <span className={`inline-block w-2 h-3.5 bg-cyan-400 ${showCursor ? 'opacity-100' : 'opacity-0'}`} />
+          <div className="flex items-center gap-1.5 text-cyan-400 px-3 pt-2">
+            <span className="text-sm">$</span>
+            <span className={`inline-block w-2 h-4 bg-cyan-400 ${showCursor ? 'opacity-100' : 'opacity-0'}`} />
           </div>
         )}
 
