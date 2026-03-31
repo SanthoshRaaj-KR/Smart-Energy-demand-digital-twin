@@ -223,6 +223,13 @@ def run_simulation() -> None:
             else:
                 today_forecast = float(node.demand_mw)
                 forecast_7d = [today_forecast] * 7
+                # --- Smart Mock: Force Day 3 Heatwave for UP to trigger logic if model missing ---
+                if nid == "UP":
+                    forecast_7d[2] = today_forecast * 1.25 # 25% spike on Day 3
+                if nid == "KAR":
+                    # Give KAR a surplus today so it can choose to hoard vs sell
+                    # But the physics env sets KAR generation high already.
+                    pass
 
             state_agent_math = StateAgent(
                 city_id=nid,
@@ -235,11 +242,19 @@ def run_simulation() -> None:
                 todays_demand_forecast_mw=today_forecast,
                 intelligence=ctx,
                 safety_buffer=1.05,
-                pre_event_hour=3,
+                pre_event_hoard_hour=3,
                 normal_dispatch_hour=14,
             )
             state_positions[nid] = pos
-            all_phase_logs[nid] = all_phase_logs.get(nid, []) + list(pos.phase_log)
+            
+            # --- Virtual Battery / Spin-Up Log Integration ---
+            phaselog_addition = list(pos.phase_log)
+            if pos.pre_event_hoard:
+                ramping_log = f"RAMPING: Baseload Thermal Spin-Up for Day {ctx.get('hoard_day', 2)} Event"
+                phaselog_addition.append(ramping_log)
+                print(f"  {nid}: {ramping_log}")
+
+            all_phase_logs[nid] = all_phase_logs.get(nid, []) + phaselog_addition
 
             node.adjusted_demand_mw = pos.adjusted_demand_mw
             node.generation_mw = pos.adjusted_supply_mw

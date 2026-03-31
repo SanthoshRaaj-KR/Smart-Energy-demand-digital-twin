@@ -70,7 +70,7 @@ class StateAgent:
         todays_demand_forecast_mw: float,
         intelligence: dict[str, Any],
         safety_buffer: float = 1.05,
-        pre_event_hour: int = 3,
+        pre_event_hoard_hour: int = 3,
         normal_dispatch_hour: int = 14,
     ) -> StatePosition:
         """
@@ -109,7 +109,28 @@ class StateAgent:
         deficit = abs(net) if net < 0 else 0.0
         surplus = net if net > 0 else 0.0
 
-        dispatch_hour_hint = pre_event_hour if pre_event_hoard else normal_dispatch_hour
+        # --- Selfish Seller / Self-Preservation Logic ---
+        future_hoard_triggered = False
+        future_deficit_mw = 0.0
+        hoard_day = 0
+        if forecast_7d_mw and len(forecast_7d_mw) > 1 and surplus > 0:
+            # Check for massive deficit in the next 1-6 days
+            for i, future_demand in enumerate(forecast_7d_mw[1:], start=1):
+                # Using today's supply as baseline expected future supply
+                day_net = adjusted_supply - future_demand
+                if day_net < 0 and abs(day_net) > (0.05 * adjusted_supply):  # > 5% deficit
+                    future_hoard_triggered = True
+                    future_deficit_mw = abs(day_net)
+                    hoard_day = i
+                    break
+        
+        if future_hoard_triggered:
+            pre_event_hoard = True
+            # Force net to 0, hoarding the surplus
+            surplus = 0.0
+            net = 0.0
+
+        dispatch_hour_hint = pre_event_hoard_hour if pre_event_hoard else normal_dispatch_hour
 
         phase_log = [
             (
@@ -127,6 +148,13 @@ class StateAgent:
                 f"dispatch_hour_hint={dispatch_hour_hint:02d}:00"
             ),
         ]
+
+        if future_hoard_triggered:
+            phase_log.append(
+                f"SELF-PRESERVATION state={self.city_id} hoarding for Day {hoard_day} deficit={future_deficit_mw:.2f} MW. Surplus retained."
+            )
+            intelligence["pre_event_hoard"] = True
+            intelligence["hoard_day"] = hoard_day
 
         return StatePosition(
             state_id=self.city_id,

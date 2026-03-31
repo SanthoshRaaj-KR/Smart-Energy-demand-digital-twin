@@ -116,6 +116,7 @@ class DetectedEvent:
     demand_direction : str    # "increase" | "decrease" | "mixed"
     confidence       : str    # "low" | "medium" | "high"
     source_headlines : List[str]
+    affected_corridors: List[str]
 
 
 @dataclass
@@ -142,6 +143,8 @@ class GridMultipliers:
     confidence                     : float
     key_driver                     : str
     reasoning                      : str
+    severity_level                 : int
+
 
 
 @dataclass

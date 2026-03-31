@@ -272,6 +272,8 @@ class RoutingAgent:
                     approved_mw=float(decider["approved_mw"]),
                     residual_deficit_mw=max(float(buyer.remaining_mw), 0.0),
                     dispatch_hour=int(dispatch_hour) if dispatch_hour is not None else None,
+                    radar_locked=gate.get("radar_locked", False),
+                    radar_alert=gate.get("radar_alert", ""),
                     route_agent="DOUBLE_DQN_PROXY",
                     decision_trace=trace,
                 )

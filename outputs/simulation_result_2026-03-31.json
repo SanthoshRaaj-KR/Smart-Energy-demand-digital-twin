@@ -1,0 +1,108 @@
+{
+  "date": "2026-03-31",
+  "dispatches": [],
+  "load_shedding": [],
+  "decision_log": [],
+  "xai_log": [],
+  "phase_logs": {
+    "BHR": [
+      "PHASE_1_CALIBRATION state=BHR avg_forecast=10037.12 safety_buffer=1.05 baseline_supply=10538.98",
+      "PHASE_2_INTELLIGENCE state=BHR today_forecast=10037.12 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=10037.12 adjusted_supply=10538.98 net=501.86 deficit=0.00 surplus=501.86",
+      "PHASE_2_TEMPORAL state=BHR pre_event_hoard=False dispatch_hour_hint=14:00"
+    ],
+    "UP": [
+      "PHASE_1_CALIBRATION state=UP avg_forecast=15504.66 safety_buffer=1.05 baseline_supply=16279.89",
+      "PHASE_2_INTELLIGENCE state=UP today_forecast=14970.01 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=14970.01 adjusted_supply=16279.89 net=0.00 deficit=0.00 surplus=0.00",
+      "PHASE_2_TEMPORAL state=UP pre_event_hoard=True dispatch_hour_hint=03:00",
+      "SELF-PRESERVATION state=UP hoarding for Day 2 deficit=2432.63 MW. Surplus retained.",
+      "RAMPING: Baseload Thermal Spin-Up for Day 2 Event"
+    ],
+    "WB": [
+      "PHASE_1_CALIBRATION state=WB avg_forecast=13062.75 safety_buffer=1.05 baseline_supply=13715.89",
+      "PHASE_2_INTELLIGENCE state=WB today_forecast=13062.75 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=13062.75 adjusted_supply=13715.89 net=653.14 deficit=0.00 surplus=653.14",
+      "PHASE_2_TEMPORAL state=WB pre_event_hoard=False dispatch_hour_hint=14:00"
+    ],
+    "KAR": [
+      "PHASE_1_CALIBRATION state=KAR avg_forecast=13258.40 safety_buffer=1.05 baseline_supply=13921.32",
+      "PHASE_2_INTELLIGENCE state=KAR today_forecast=13258.40 economic_demand_multiplier=1.000 generation_multiplier=1.000 adjusted_demand=13258.40 adjusted_supply=13921.32 net=662.92 deficit=0.00 surplus=662.92",
+      "PHASE_2_TEMPORAL state=KAR pre_event_hoard=False dispatch_hour_hint=14:00"
+    ]
+  },
+  "settlement_ledger": {
+    "date": "2026-03-31",
+    "states": {
+      "BHR": {
+        "generation_mw": 10538.978820183971,
+        "adjusted_demand_mw": 10037.122685889495,
+        "balance_mw": 501.85613429447585,
+        "battery_soc": 1.0,
+        "battery_charge_mwh": 500.0,
+        "sold_mw": 0.0,
+        "bought_mw": 0.0,
+        "hoarded_mw": 0.0,
+        "load_shed_mw": 0.0
+      },
+      "UP": {
+        "generation_mw": 16279.887963347597,
+        "adjusted_demand_mw": 14970.01192031963,
+        "balance_mw": 1309.8760430279672,
+        "battery_soc": 1.0,
+        "battery_charge_mwh": 800.0,
+        "sold_mw": 0.0,
+        "bought_mw": 0.0,
+        "hoarded_mw": 0.0,
+        "load_shed_mw": 0.0
+      },
+      "WB": {
+        "generation_mw": 13715.885565578228,
+        "adjusted_demand_mw": 13062.74815769355,
+        "balance_mw": 653.1374078846784,
+        "battery_soc": 1.0,
+        "battery_charge_mwh": 600.0,
+        "sold_mw": 0.0,
+        "bought_mw": 0.0,
+        "hoarded_mw": 0.0,
+        "load_shed_mw": 0.0
+      },
+      "KAR": {
+        "generation_mw": 13921.315066547544,
+        "adjusted_demand_mw": 13258.39530147385,
+        "balance_mw": 662.9197650736933,
+        "battery_soc": 1.0,
+        "battery_charge_mwh": 1000.0,
+        "sold_mw": 0.0,
+        "bought_mw": 0.0,
+        "hoarded_mw": 0.0,
+        "load_shed_mw": 0.0
+      }
+    },
+    "dispatch_count": 0,
+    "load_shedding_count": 0
+  },
+  "summary": {
+    "BHR": {
+      "generation_mw": 10538.979,
+      "demand_mw": 10037.123,
+      "balance_mw": 501.856,
+      "battery_soc": 1.0
+    },
+    "UP": {
+      "generation_mw": 16279.888,
+      "demand_mw": 14970.012,
+      "balance_mw": 1309.876,
+      "battery_soc": 1.0
+    },
+    "WB": {
+      "generation_mw": 13715.886,
+      "demand_mw": 13062.748,
+      "balance_mw": 653.137,
+      "battery_soc": 1.0
+    },
+    "KAR": {
+      "generation_mw": 13921.315,
+      "demand_mw": 13258.395,
+      "balance_mw": 662.92,
+      "battery_soc": 1.0
+    }
+  }
+}

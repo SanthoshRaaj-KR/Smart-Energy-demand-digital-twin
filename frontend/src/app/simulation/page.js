@@ -6,6 +6,7 @@ import { SimTerminal } from '@/components/grid/SimTerminal'
 import { AgentChat } from '@/components/agents/AgentChat'
 import { GridMap } from '@/components/grid/GridMap'
 import { DispatchTable } from '@/components/grid/DispatchTable'
+import { DispatcherRadar } from '@/components/grid/DispatcherRadar'
 import { Card, SectionLabel, Badge } from '@/components/ui/Primitives'
 
 const TABS = [
@@ -187,6 +188,10 @@ export default function SimulationPage() {
             <div className="flex items-center justify-between">
               <SectionLabel>Dispatch Orders and Settlement</SectionLabel>
             </div>
+            
+            {/* New Dispatcher Radar Visual */}
+            <DispatcherRadar results={results} />
+
             <Card>
               <DispatchTable results={results} />
             </Card>

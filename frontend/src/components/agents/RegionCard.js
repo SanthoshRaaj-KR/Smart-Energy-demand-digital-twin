@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Route, Factory, CalendarClock, Zap, Thermometer } from 'lucide-react'
+import { AlertTriangle, Route, Factory, CalendarClock, Zap, Thermometer, Battery, ArrowDownRight, ShieldCheck } from 'lucide-react'
 import { Card, SectionLabel, Badge, RiskFlag } from '@/components/ui/Primitives'
 import { REGION_BY_ID } from '@/lib/gridMeta'
 
@@ -141,6 +141,9 @@ export function RegionCard({ regionId, data }) {
   const fuelRoutes = compact(intel.fuel_supply_routes || [])
   const fuelSources = compact(intel.primary_fuel_sources || [])
 
+  const hoardDay = multipliers.hoard_day || 0
+  const isHoarding = hoardActive || hoardDay > 0
+
   const [pinDetails, setPinDetails] = useState(false)
   const [allDrivers, setAllDrivers] = useState(false)
   const [allSeasonal, setAllSeasonal] = useState(false)
@@ -173,6 +176,76 @@ export function RegionCard({ regionId, data }) {
           <div className="text-xs text-grid-textDim">{region.fullName}</div>
         </div>
         <Badge variant={hasRisk ? 'amber' : 'green'}>{hasRisk ? 'RISK WATCH' : 'STABLE'}</Badge>
+      </div>
+
+      {/* 7-Day Horizon Cells */}
+      <div className="mb-4">
+        <div className="text-[10px] uppercase tracking-[0.15em] text-grid-textDim mb-2 flex justify-between items-center" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+           <span>7-Day Security Horizon</span>
+           {isHoarding && <span className="text-amber-400 flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> SELF-PRESERVATION ACTIVE</span>}
+        </div>
+        <div className="flex gap-1.5 h-8">
+          {[...Array(7)].map((_, i) => {
+            const isTargetDay = (i + 1) === hoardDay;
+            const isToday = i === 0;
+            return (
+              <div 
+                key={i} 
+                className={`flex-1 rounded-sm border transition-all duration-500 flex items-center justify-center text-[10px] font-bold
+                  ${isTargetDay ? 'bg-red-500/20 border-red-500 animate-pulse scale-105 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 
+                    isToday ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-grid-border/30 text-grid-textDim'}
+                `}
+                style={{ fontFamily: 'IBM Plex Mono, monospace' }}
+              >
+                D{i+1}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Hoarding Animation & Storage Vault */}
+      {isHoarding && (
+        <div className="relative mb-4 h-12 flex items-center justify-between px-2 bg-amber-500/5 rounded-lg border border-amber-500/20 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/5 to-transparent animate-shimmer" />
+          <div className="flex flex-col">
+            <span className="text-[9px] uppercase text-amber-500 font-bold" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>Surplus Lock</span>
+            <span className="text-[11px] text-white font-medium">Hoarding for Day {hoardDay}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div className="flex items-center text-amber-400">
+               <ArrowDownRight className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="w-10 h-10 rounded-full border-2 border-amber-500 flex items-center justify-center bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
+                <Battery className="w-5 h-5 text-amber-400" />
+            </div>
+          </div>
+          <div className="absolute top-0 right-0 p-1">
+             <span className="text-[8px] text-amber-500 animate-pulse">VAULTING...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Virtual Battery / Spin-Up Gauge */}
+      <div className="mb-4 space-y-1.5">
+        <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-grid-textDim" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+          <span>Pumped Hydro Reservoir / Spin-Up</span>
+          <span className={isHoarding ? 'text-amber-400' : 'text-cyan-400'}>{isHoarding ? 'RAMPING (85%)' : 'STABLE (62%)'}</span>
+        </div>
+        <div className="h-3 rounded-full bg-black/40 border border-grid-border/30 overflow-hidden p-0.5">
+           <div 
+             className={`h-full rounded-full transition-all duration-1000 relative ${isHoarding ? 'bg-amber-500 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-cyan-500/60'}`}
+             style={{ width: isHoarding ? '85%' : '62%' }}
+           >
+             {isHoarding && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
+           </div>
+        </div>
+        {isHoarding && (
+          <div className="text-[9px] text-amber-400 font-medium italic" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
+            RAMPING: Baseload Thermal Spin-Up for Day {hoardDay} Event
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">

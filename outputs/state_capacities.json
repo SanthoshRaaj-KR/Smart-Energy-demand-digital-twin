@@ -1,0 +1,51 @@
+{
+  "date": "2026-03-31",
+  "states": {
+    "BHR": {
+      "generation_mw": 10538.978820183971,
+      "adjusted_demand_mw": 10037.122685889495,
+      "balance_mw": 501.85613429447585,
+      "battery_soc": 1.0,
+      "battery_charge_mwh": 500.0,
+      "sold_mw": 0.0,
+      "bought_mw": 0.0,
+      "hoarded_mw": 0.0,
+      "load_shed_mw": 0.0
+    },
+    "UP": {
+      "generation_mw": 16279.887963347597,
+      "adjusted_demand_mw": 14970.01192031963,
+      "balance_mw": 1309.8760430279672,
+      "battery_soc": 1.0,
+      "battery_charge_mwh": 800.0,
+      "sold_mw": 0.0,
+      "bought_mw": 0.0,
+      "hoarded_mw": 0.0,
+      "load_shed_mw": 0.0
+    },
+    "WB": {
+      "generation_mw": 13715.885565578228,
+      "adjusted_demand_mw": 13062.74815769355,
+      "balance_mw": 653.1374078846784,
+      "battery_soc": 1.0,
+      "battery_charge_mwh": 600.0,
+      "sold_mw": 0.0,
+      "bought_mw": 0.0,
+      "hoarded_mw": 0.0,
+      "load_shed_mw": 0.0
+    },
+    "KAR": {
+      "generation_mw": 13921.315066547544,
+      "adjusted_demand_mw": 13258.39530147385,
+      "balance_mw": 662.9197650736933,
+      "battery_soc": 1.0,
+      "battery_charge_mwh": 1000.0,
+      "sold_mw": 0.0,
+      "bought_mw": 0.0,
+      "hoarded_mw": 0.0,
+      "load_shed_mw": 0.0
+    }
+  },
+  "dispatch_count": 0,
+  "load_shedding_count": 0
+}

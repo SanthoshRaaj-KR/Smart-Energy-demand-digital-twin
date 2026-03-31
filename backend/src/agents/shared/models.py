@@ -88,6 +88,8 @@ class DispatchRecord:
     approved_mw       : float = 0.0
     residual_deficit_mw: float = 0.0
     dispatch_hour     : Optional[int] = None
+    radar_locked      : bool = False
+    radar_alert       : str = ""
     route_agent       : str = "DOUBLE_DQN_PROXY"
     decision_trace    : list[str] = field(default_factory=list)
 
