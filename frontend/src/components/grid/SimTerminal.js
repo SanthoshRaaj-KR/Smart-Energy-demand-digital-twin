@@ -13,7 +13,7 @@ const AGENT_COLORS = {
   STREAM:    { color: '#94a3b8', label: 'LIVE',   bg: 'rgba(148,163,184,0.08)' },
 }
 
-export function SimTerminal({ logs, running, done, onRun }) {
+export function SimTerminal({ logs, running, done, onRun, disabled = false }) {
   const bottomRef = useRef(null)
   const [showCursor, setShowCursor] = useState(true)
 
@@ -27,6 +27,7 @@ export function SimTerminal({ logs, running, done, onRun }) {
   }, [])
 
   const isEmpty = logs.length === 0
+  const isDisabled = disabled || running
 
   return (
     <div className="glass rounded-xl overflow-hidden border border-grid-border/80">
@@ -61,16 +62,17 @@ export function SimTerminal({ logs, running, done, onRun }) {
           )}
           <button
             onClick={onRun}
-            disabled={running}
+            disabled={isDisabled}
             className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all duration-200 ${
-              running
+              isDisabled
                 ? 'bg-grid-border/50 text-grid-muted cursor-not-allowed'
                 : 'bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/25 border border-cyan-500/20'
             }`}
             style={{ fontFamily: 'IBM Plex Mono, monospace' }}
+            title={disabled ? 'Pipeline not ready - generate intelligence first' : ''}
           >
             {done ? <RotateCcw className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-            {running ? 'Running...' : done ? 'Re-run' : 'Run Sim'}
+            {running ? 'Running...' : disabled ? 'Pipeline Required' : done ? 'Re-run' : 'Run Sim'}
           </button>
         </div>
       </div>

@@ -127,6 +127,7 @@ class NodeOrchestrator:
             "confidence": 0.0,
             "key_driver": "Baseline",
             "reasoning": "Neutral defaults before multiplier synthesis.",
+            "severity_level": 1,
         }
 
     def _build_phase_trace(

@@ -166,6 +166,7 @@ class MultiplierSynthAgent(BaseLLMAgent):
                 confidence                     = float(data.get("confidence", 0.5)),
                 key_driver                     = data.get("key_driver", "Unknown"),
                 reasoning                      = data.get("reasoning", ""),
+                severity_level                 = int(data.get("severity_level", 1)),
             )
         except (json.JSONDecodeError, KeyError, ValueError) as exc:
             print(f"    [!] MultiplierSynthAgent parse error for {city_name}: {exc}")
@@ -175,4 +176,5 @@ class MultiplierSynthAgent(BaseLLMAgent):
                 demand_spike_risk="UNKNOWN", supply_shortfall_risk="UNKNOWN",
                 seven_day_demand_forecast_mw_delta=0, confidence=0.0,
                 key_driver="Parse error", reasoning=str(exc),
+                severity_level=1,
             )

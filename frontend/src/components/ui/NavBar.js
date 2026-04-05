@@ -1,10 +1,11 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Activity, Brain, Zap, GitBranch } from 'lucide-react'
+import { Activity, Brain, Zap, GitBranch, Workflow } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/',             label: 'Dashboard',    icon: Activity },
+  { href: '/pipeline',     label: 'Pipeline',     icon: Workflow },
   { href: '/intelligence', label: 'Intelligence', icon: Brain },
   { href: '/simulation',   label: 'War Room',     icon: Zap },
 ]

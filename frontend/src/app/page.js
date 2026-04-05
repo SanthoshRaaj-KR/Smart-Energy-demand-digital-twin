@@ -1,11 +1,12 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
-import { Activity, Cpu, GitBranch, Zap, BarChart2, CloudLightning, ChevronRight } from 'lucide-react'
+import { Activity, Cpu, GitBranch, Zap, BarChart2, CloudLightning, ChevronRight, Workflow } from 'lucide-react'
 import Link from 'next/link'
 import { ForecastChart } from '@/components/charts/ForecastChart'
 import { GridMap } from '@/components/grid/GridMap'
 import { Card, SectionLabel, StatBlock, ProgressBar, Badge } from '@/components/ui/Primitives'
-import { useGridStatus, useIntelligence } from '@/hooks/useApi'
+import { PipelineStatusBar } from '@/components/ui/PipelineExplainer'
+import { usePipeline } from '@/hooks/usePipeline'
 import { REGIONS } from '@/lib/gridMeta'
 
 const FEATURE_CARDS = [
@@ -140,8 +141,16 @@ function RegionStatusRow({ nodes }) {
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
-  const { data: gridStatus } = useGridStatus()
-  const { data: intelligence } = useIntelligence()
+  
+  // Use unified pipeline instead of separate hooks
+  const {
+    stage,
+    stageHistory,
+    intelligence,
+    gridStatus,
+    isReady,
+    isLoading,
+  } = usePipeline({ autoStart: true })
 
   useEffect(() => setMounted(true), [])
 
@@ -184,6 +193,13 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-wrap gap-3">
+                <Link href="/pipeline"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
+                  style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)', fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, letterSpacing: '0.05em' }}>
+                  <Workflow className="w-4 h-4" />
+                  Data Pipeline
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
                 <Link href="/intelligence"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
                   style={{ background: 'rgba(0,212,255,0.1)', color: '#00d4ff', border: '1px solid rgba(0,212,255,0.2)', fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, letterSpacing: '0.05em' }}>
@@ -228,6 +244,15 @@ export default function HomePage() {
       </section>
 
       <section className="max-w-7xl mx-auto px-6 py-8">
+        {/* Pipeline Status Bar */}
+        <Link href="/pipeline" className="block mb-6">
+          <PipelineStatusBar 
+            stage={stage} 
+            stageHistory={stageHistory}
+            onExpand={() => {}}
+          />
+        </Link>
+        
         <div className="flex items-center gap-3 mb-4">
           <SectionLabel>Real-Time Grid Status</SectionLabel>
           <div className="flex-1 h-px bg-grid-border/30" />

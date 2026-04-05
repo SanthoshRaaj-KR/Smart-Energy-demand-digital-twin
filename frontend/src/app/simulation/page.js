@@ -1,7 +1,9 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { Zap, Network, BarChart2, MessageSquare } from 'lucide-react'
+import { Zap, Network, BarChart2, MessageSquare, AlertTriangle, CheckCircle, Brain, RefreshCw } from 'lucide-react'
 import { useSimulation, useGridStatus } from '@/hooks/useApi'
+import { usePipeline, STAGES } from '@/hooks/usePipeline'
+import { PipelineStatusBar } from '@/components/ui/PipelineExplainer'
 import { SimTerminal } from '@/components/grid/SimTerminal'
 import { AgentChat } from '@/components/agents/AgentChat'
 import { GridMap } from '@/components/grid/GridMap'
@@ -20,12 +22,26 @@ export default function SimulationPage() {
   const { logs, results, running, done, runSimulation } = useSimulation()
   const { data: gridStatus } = useGridStatus()
   const [activeTab, setActiveTab] = useState('terminal')
+  
+  // Pipeline integration
+  const {
+    stage: pipelineStage,
+    stageHistory,
+    isReady: pipelineReady,
+    hasIntelligence,
+    needsGeneration,
+    generateIntelligence,
+    runPipeline,
+  } = usePipeline({ autoStart: true })
 
   const edges = gridStatus?.edges || []
   const topCongested = useMemo(
     () => [...edges].sort((a, b) => Number(b.congestion || 0) - Number(a.congestion || 0)).slice(0, 5),
     [edges]
   )
+  
+  // Check if simulation should be blocked
+  const canRunSimulation = pipelineReady && hasIntelligence
 
   return (
     <div className="pt-14">
@@ -62,12 +78,78 @@ export default function SimulationPage() {
                   SIMULATION COMPLETE
                 </Badge>
               )}
+              {!canRunSimulation && !running && (
+                <Badge variant="amber">
+                  <AlertTriangle className="w-3 h-3" />
+                  PIPELINE REQUIRED
+                </Badge>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6">
+        {/* Pipeline Status Bar */}
+        <div className="mb-6">
+          <PipelineStatusBar 
+            stage={pipelineStage}
+            stageHistory={stageHistory}
+            onExpand={() => {}}
+          />
+        </div>
+        
+        {/* Pipeline Warning if not ready */}
+        {!canRunSimulation && !running && (
+          <Card className="mb-6 border-amber-500/30">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white mb-1" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                  Pipeline Not Ready
+                </h3>
+                <p className="text-sm text-grid-textDim mb-3">
+                  {needsGeneration 
+                    ? 'Intelligence data is required before running simulations. The AI needs context about regional conditions to make accurate dispatch decisions.'
+                    : 'Waiting for pipeline to complete. Grid status and intelligence data are being loaded.'}
+                </p>
+                <div className="flex gap-2">
+                  {needsGeneration && (
+                    <button
+                      onClick={generateIntelligence}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
+                      style={{ 
+                        background: 'rgba(139,92,246,0.15)', 
+                        color: '#a78bfa', 
+                        border: '1px solid rgba(139,92,246,0.3)',
+                        fontFamily: 'Rajdhani, sans-serif',
+                      }}
+                    >
+                      <Brain className="w-4 h-4" />
+                      Generate Intelligence
+                    </button>
+                  )}
+                  <button
+                    onClick={runPipeline}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105"
+                    style={{ 
+                      background: 'rgba(34,211,238,0.15)', 
+                      color: '#22d3ee', 
+                      border: '1px solid rgba(34,211,238,0.3)',
+                      fontFamily: 'Rajdhani, sans-serif',
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Run Pipeline
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+        
         <div className="flex gap-1 mb-6 border-b border-grid-border/40 pb-0">
           {TABS.map(tab => {
             const Icon = tab.icon
@@ -107,7 +189,8 @@ export default function SimulationPage() {
               logs={logs}
               running={running}
               done={done}
-              onRun={runSimulation}
+              onRun={canRunSimulation ? runSimulation : undefined}
+              disabled={!canRunSimulation}
             />
           </div>
         )}
@@ -116,7 +199,7 @@ export default function SimulationPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <SectionLabel>Agent Negotiation Feed</SectionLabel>
-              {!running && !done && (
+              {!running && !done && canRunSimulation && (
                 <button
                   onClick={() => { runSimulation(); setActiveTab('agents') }}
                   className="text-xs text-cyan-400 border border-cyan-500/20 px-3 py-1 rounded hover:bg-cyan-500/10 transition-colors"
