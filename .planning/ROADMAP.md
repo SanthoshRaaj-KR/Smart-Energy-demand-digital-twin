@@ -1,139 +1,133 @@
 # Smart Grid Simulation - Roadmap
 
 **Project:** Multi-Agent Smart Grid Simulator  
-**Milestone:** M1 - Core Workflow Foundation  
-**Status:** Phase 1 in progress
+**Workflow:** Stage 1 (A Priori) → Stage 2 (Delta) → Stage 3 (Waterfall) → Stage 4 (Memory)  
+**Status:** Phases 1-8 complete, planning/execution for Phases 9-14
 
 ---
 
-## Overview
+## Completed Phases (Implemented)
 
-This roadmap implements the **4-stage workflow** (A Priori Planner → Delta Trigger → Waterfall Orchestrator → Self-Healing Memory) across 5 phases, establishing the architectural foundation before building patent features.
+### Phase 1: Agent Architecture Cleanup
+**Goal:** Consolidate and map agents to the 4-stage architecture  
+**Requirements:** REQ-001, REQ-002, REQ-003  
+**Status:** ✅ Complete
 
-**Scope:** Backend only (frontend deferred to Phase 11)  
-**Target:** Autonomous 30-day grid simulation with ~70% LLM cost reduction
+### Phase 2: Stage 1 - A Priori Planner
+**Goal:** Build 30-day baseline schedule and LLM sleep/wake gating  
+**Requirements:** REQ-004, REQ-005, REQ-006  
+**Status:** ✅ Complete
+
+### Phase 3: Stage 2 - Delta Trigger
+**Goal:** Compute anomaly Delta and wake orchestrator only when needed  
+**Requirements:** REQ-007, REQ-008, REQ-009, REQ-010  
+**Status:** ✅ Complete
+
+### Phase 4: Stage 3 - Waterfall Orchestrator
+**Goal:** Enforce Battery → DR → BFS Routing → Fallback  
+**Requirements:** REQ-011, REQ-012, REQ-013, REQ-014, REQ-015  
+**Status:** ✅ Complete
+
+### Phase 5: Stage 4 - Self-Healing Memory
+**Goal:** 3-day memory buffer and failure-aware next-day routing context  
+**Requirements:** REQ-016, REQ-017, REQ-018, REQ-019  
+**Status:** ✅ Complete
+
+### Phase 6: DR Bounty Auctions
+**Goal:** Implement game-theoretic reverse auction for local demand response  
+**Requirements:** REQ-020, REQ-021  
+**Status:** ✅ Complete
+
+### Phase 7: Lifeboat Protocol
+**Goal:** Capacity-constrained graph-cut islanding under frequency emergency  
+**Requirements:** REQ-022, REQ-023  
+**Status:** ✅ Complete
+
+### Phase 8: LLM Parameter Autopsy
+**Goal:** End-of-cycle reflective parameter patch generation  
+**Requirements:** REQ-024, REQ-025  
+**Status:** ✅ Complete
 
 ---
 
-## Phase 1: Agent Architecture Cleanup
+## Remaining Phases (9-14)
 
-**Goal:** Audit and streamline agent hierarchy from 20+ scattered files to 8 core agents with clear workflow mapping
-
-**Requirements:** REQ-001, REQ-002, REQ-003
-
-**Plans:** 3 plans
-
-Plans:
-- [ ] 01-01-PLAN.md — Audit existing agents and create registry
-- [ ] 01-02-PLAN.md — Delete/merge redundant agents
-- [ ] 01-03-PLAN.md — Validate new structure
-
-**Success Criteria:**
-- AGENT_REGISTRY.md exists mapping all agents to stages
-- `src/agents/` has max 8 subdirectories
-- All tests pass after cleanup
-
----
-
-## Phase 2: Stage 1 - A Priori Planner Integration
-
-**Goal:** Integrate LightGBM baseline scheduling that creates 30-day forecast and sets LLM sleep/wake flags
-
-**Requirements:** REQ-004, REQ-005, REQ-006
-
+### Phase 9: 7-Phase XAI Audit Ledger
+**Goal:** Produce regulator-readable phase-by-phase reasoning ledger for each simulation day  
+**Requirements:** REQ-026, REQ-027, REQ-028  
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Refactor ForwardMarketPlanner with baseline generation
-- [ ] 02-02-PLAN.md — Update main.py workflow to run planner first
-
-**Success Criteria:**
-- `outputs/baseline_schedule_YYYY-MM-DD.json` generated
-- Contains 30-day predictions for all 4 states
-- `llm_agents_enabled` flag correctly set per day
+- [ ] 09-01-PLAN.md — Define structured ledger contract and emit phase events
+- [ ] 09-02-PLAN.md — Compile/export daily ledger and expose API endpoint
 
 ---
 
-## Phase 3: Stage 2 - Delta Trigger Mechanism
-
-**Goal:** Implement anomaly detection and Delta calculation that conditionally wakes LLM agents only when needed
-
-**Requirements:** REQ-007, REQ-008, REQ-009, REQ-010
-
+### Phase 10: Two-Tier Delta Orchestrator Integration
+**Goal:** Unify Stage 1-4 execution loop with cost accounting and strict triggers  
+**Requirements:** REQ-029, REQ-030, REQ-031  
 **Plans:** 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Refactor IntelligenceAgent with Delta calculation
-- [ ] 03-02-PLAN.md — Add conditional LLM trigger logic
-
-**Success Criteria:**
-- `outputs/delta_YYYY-MM-DD.json` only created on anomaly days
-- Test: 30-day simulation shows LLMs wake on ~10% of days
-- Delta calculation: `actual_demand - baseline_demand`
+- [ ] 10-01-PLAN.md — Build orchestration engine contract and runtime flow
+- [ ] 10-02-PLAN.md — Wire engine into simulation entrypoints + savings artifact
 
 ---
 
-## Phase 4: Stage 3 - Strict Waterfall Orchestrator
-
-**Goal:** Enforce 4-step deficit resolution sequence (Temporal → Economic → Spatial → Fallback)
-
-**Requirements:** REQ-011, REQ-012, REQ-013, REQ-014, REQ-015
-
-**Plans:** 3 plans
-
-Plans:
-- [ ] 04-01-PLAN.md — Refactor UnifiedRoutingOrchestrator with waterfall logic
-- [ ] 04-02-PLAN.md — Implement Steps 1-2 (Battery + DR stub)
-- [ ] 04-03-PLAN.md — Implement Steps 3-4 (Routing + Fallback)
-
-**Success Criteria:**
-- Battery always drained before DR attempted
-- DR attempted before transmission routing
-- Routing attempted before load shedding
-- Test: Verify step sequence in XAI logs
-
----
-
-## Phase 5: Stage 4 - Self-Healing Memory (XAI Write Loop)
-
-**Goal:** Enable XAI agent to autonomously write failure warnings to memory buffer for next-day learning
-
-**Requirements:** REQ-016, REQ-017, REQ-018, REQ-019
-
+### Phase 11: Frontend Redesign (Human-Understandable Pipeline UI)
+**Goal:** Redesign UI to show the end-to-end pipeline stage-by-stage in plain language  
+**Requirements:** REQ-032, REQ-033, REQ-034  
 **Plans:** 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Refactor XAIAgent with memory write logic
-- [ ] 05-02-PLAN.md — Test memory injection into routing prompts
-
-**Success Criteria:**
-- `grid_short_term_memory` buffer limited to 3 items
-- Memory entries auto-generated after transmission failures
-- Test: 5-day heatwave simulation shows memory prevents repeated bottlenecks
+- [ ] 11-01-PLAN.md — New IA/layout + pipeline narrative surface
+- [ ] 11-02-PLAN.md — Live stage cards, XAI ledger viewer, and smooth UX polish
 
 ---
 
-## Milestone Success Criteria
+### Phase 12: Unit Test Expansion
+**Goal:** Add deterministic unit tests for core orchestration, auction, lifeboat, and autopsy logic  
+**Requirements:** REQ-035, REQ-036  
+**Plans:** 2 plans
 
-M1 complete when:
-- ✅ All 5 phases marked complete
-- ✅ All requirements (REQ-001 through REQ-019) validated
-- ✅ 30-day simulation runs end-to-end
-- ✅ LLM API calls reduced by ~70% (vs always-on baseline)
-- ✅ Memory buffer demonstrates autonomous learning
-
----
-
-## Next Milestone
-
-**M2 - Patent Features** (Phases 6-8):
-- Phase 6: DR Bounty Reverse Auction
-- Phase 7: Lifeboat Protocol (Graph-Cut Islanding)
-- Phase 8: Recursive Hyperparameter Autopsy
-
-*Not in scope for current execution*
+Plans:
+- [ ] 12-01-PLAN.md — Add core agent unit tests with stable fixtures
+- [ ] 12-02-PLAN.md — Add regression tests for failure/memory edge cases
 
 ---
 
-**Roadmap Version:** 1.0  
+### Phase 13: End-to-End Integration Tests
+**Goal:** Validate all critical scenarios from normal operation to emergency islanding  
+**Requirements:** REQ-037, REQ-038  
+**Plans:** 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Build deterministic E2E scenario harness
+- [ ] 13-02-PLAN.md — Validate 5 canonical scenarios + artifact assertions
+
+---
+
+### Phase 14: Documentation and Demo Readiness
+**Goal:** Deliver deployable technical docs and a clear demonstration narrative  
+**Requirements:** REQ-039, REQ-040  
+**Plans:** 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — Author architecture/feature/API/deploy docs
+- [ ] 14-02-PLAN.md — Demo script, runbook, and acceptance checklist
+
+---
+
+## Program Success Criteria
+
+- ✅ 4-stage backend loop operational with conditional LLM wake-up  
+- ✅ Patent features implemented (autopsy + lifeboat)  
+- 🔄 Daily XAI ledger understandable by non-ML stakeholders  
+- 🔄 Frontend narrates all stages clearly for operators/regulators  
+- 🔄 Automated test suite validates core and integration behavior  
+- 🔄 Documentation supports handoff, review, and deployment
+
+---
+
+**Roadmap Version:** 2.0  
 **Last Updated:** 2026-04-06

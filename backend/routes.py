@@ -94,6 +94,9 @@ def _load_node_cache() -> Dict[str, Dict]:
 
 
 def _latest_simulation_file() -> Path | None:
+    if day_index is not None and day_index < 0:
+        raise HTTPException(status_code=400, detail="day_index must be >= 0")
+
     files: List[Path] = []
     for outputs_dir in OUTPUTS_DIR_CANDIDATES:
         if outputs_dir.exists():
@@ -101,6 +104,31 @@ def _latest_simulation_file() -> Path | None:
     if not files:
         return None
     return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+
+def _latest_xai_audit_ledger_file() -> Path | None:
+    files: List[Path] = []
+    for outputs_dir in OUTPUTS_DIR_CANDIDATES:
+        if outputs_dir.exists():
+            files.extend(outputs_dir.glob("audit_ledger_*.json"))
+    if not files:
+        return None
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+
+def _load_cost_savings_rows() -> List[Dict[str, Any]]:
+    for outputs_dir in OUTPUTS_DIR_CANDIDATES:
+        csv_path = outputs_dir / "api_cost_savings.csv"
+        if not csv_path.exists():
+            continue
+        try:
+            import csv
+            with csv_path.open("r", encoding="utf-8", newline="") as f:
+                reader = csv.DictReader(f)
+                return list(reader)
+        except Exception:
+            return []
+    return []
 
 
 def _load_latest_dispatch_log() -> List[Dict]:
@@ -353,6 +381,96 @@ def simulation_result():
     if not sim_file:
         return {"status": "no_result", "dispatches": [], "summary": {}, "date": None}
     return json.loads(sim_file.read_text(encoding="utf-8"))
+
+
+@app.get("/api/xai-audit-ledger")
+def xai_audit_ledger(date_str: str | None = None, day_index: int | None = None):
+    """
+    Returns the latest (or filtered) XAI daily audit ledger.
+    """
+    files: List[Path] = []
+    for outputs_dir in OUTPUTS_DIR_CANDIDATES:
+        if outputs_dir.exists():
+            files.extend(outputs_dir.glob("audit_ledger_*.json"))
+
+    if not files:
+        sim_file = _latest_simulation_file()
+        if sim_file is not None:
+            sim_payload = json.loads(sim_file.read_text(encoding="utf-8"))
+            ledgers = sim_payload.get("xai_daily_ledgers", [])
+            if ledgers:
+                if date_str is not None:
+                    filtered = [l for l in ledgers if str(l.get("date")) == str(date_str)]
+                    if day_index is not None:
+                        filtered = [l for l in filtered if int(l.get("day_index", -1)) == int(day_index)]
+                    if filtered:
+                        return filtered[-1]
+                return ledgers[-1]
+        raise HTTPException(status_code=404, detail="No XAI audit ledger found. Run simulation first.")
+
+    selected: Path | None = None
+    if date_str is not None and day_index is not None:
+        token = f"audit_ledger_{date_str}_day{int(day_index) + 1:03d}.json"
+        for fp in files:
+            if fp.name == token:
+                selected = fp
+                break
+    elif date_str is not None:
+        matched = [fp for fp in files if f"audit_ledger_{date_str}_" in fp.name]
+        if matched:
+            selected = sorted(matched, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+    if selected is None:
+        selected = _latest_xai_audit_ledger_file()
+
+    if selected is None or not selected.exists():
+        raise HTTPException(status_code=404, detail="Requested XAI audit ledger not found.")
+
+    return json.loads(selected.read_text(encoding="utf-8"))
+
+
+@app.get("/api/cost-savings")
+def cost_savings():
+    """
+    Returns orchestration cost-savings rows and summary.
+    """
+    rows = _load_cost_savings_rows()
+    if not rows:
+        sim_file = _latest_simulation_file()
+        if sim_file is not None:
+            sim_payload = json.loads(sim_file.read_text(encoding="utf-8"))
+            daily = sim_payload.get("orchestration_daily", [])
+            if daily:
+                rows = daily
+    if not rows:
+        return {"status": "no_data", "rows": [], "summary": {}}
+
+    def to_float(v: Any) -> float:
+        try:
+            return float(v)
+        except Exception:
+            return 0.0
+
+    total_days = len(rows)
+    llm_wake_days = sum(1 for r in rows if str(r.get("llm_agents_enabled", "")).lower() in {"true", "1"})
+    baseline_cost = sum(to_float(r.get("estimated_baseline_cost")) for r in rows)
+    llm_cost = sum(to_float(r.get("estimated_llm_cost")) for r in rows)
+    savings = sum(to_float(r.get("estimated_savings")) for r in rows)
+    savings_pct = (savings / llm_cost * 100.0) if llm_cost > 0 else 0.0
+
+    return {
+        "status": "ok",
+        "rows": rows,
+        "summary": {
+            "total_days": total_days,
+            "llm_wake_days": llm_wake_days,
+            "llm_sleep_days": total_days - llm_wake_days,
+            "baseline_cost_total": round(baseline_cost, 4),
+            "llm_cost_total": round(llm_cost, 4),
+            "estimated_savings_total": round(savings, 4),
+            "estimated_savings_pct": round(savings_pct, 2),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------

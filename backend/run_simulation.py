@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import csv
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -26,9 +27,12 @@ from src.agents.routing_agent.phase8_xai_agent import Phase8XAIAgent
 from src.agents.routing_agent.unified_routing_orchestrator import UnifiedRoutingOrchestrator
 from src.agents.routing_agent.settlement import SettlementAgent
 from src.agents.routing_agent.syndicate_xai import SyndicateXAI
+from src.agents.xai.audit_ledger import XAIDailyAuditLedger
 from src.agents.fusion_agent.inference import load_artefacts, predict_all_regions
 from src.agents.shared.models import Order, DispatchRecord
 from src.agents.intelligence_agent.setup import GridEvent
+from src.agents.intelligence_agent.orchestrator import SmartGridIntelligenceAgent
+from src.orchestration.engine import OrchestrationEngine
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,6 +56,86 @@ DEFAULT_SIMULATION_CONFIG = {
         "default": [1.0] * 7,
     },
 }
+
+
+def _build_delta_event_from_context(contexts: Dict[str, Dict[str, Any]]) -> Dict[str, Any] | None:
+    deltas: Dict[str, float] = {}
+    for nid, ctx in contexts.items():
+        gm = ctx.get("grid_multipliers", {})
+        delta = float(gm.get("seven_day_demand_forecast_mw_delta", 0.0) or 0.0)
+        if abs(delta) > 0:
+            deltas[nid] = delta
+
+    if not deltas:
+        return None
+
+    total_delta = float(sum(deltas.values()))
+    max_state = max(deltas, key=lambda k: abs(deltas[k]))
+    severity = SmartGridIntelligenceAgent._get_severity_level(total_delta)
+
+    return {
+        "anomaly_delta_mw": round(total_delta, 2),
+        "severity": severity,
+        "states": deltas,
+        "max_state": max_state,
+        "max_state_delta_mw": round(float(deltas[max_state]), 2),
+    }
+
+
+def _load_baseline_day(day_index: int, output_dir: Path) -> Dict[str, Any] | None:
+    baseline_file = output_dir / f"baseline_schedule_{date.today().isoformat()}.json"
+    if not baseline_file.exists():
+        return None
+    try:
+        payload = json.loads(baseline_file.read_text(encoding="utf-8"))
+        schedule = payload.get("schedule", [])
+        if not isinstance(schedule, list) or not schedule:
+            return None
+        safe_idx = min(day_index, len(schedule) - 1)
+        return schedule[safe_idx]
+    except Exception:
+        return None
+
+
+def _append_cost_savings_row(
+    *,
+    output_dir: Path,
+    sim_date: str,
+    summary: Dict[str, Any],
+) -> None:
+    csv_path = output_dir / "api_cost_savings.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not csv_path.exists()
+    with csv_path.open("a", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "date",
+                "day_index",
+                "llm_agents_enabled",
+                "anomaly_detected",
+                "max_state_imbalance_mw",
+                "estimated_baseline_cost",
+                "estimated_llm_cost",
+                "estimated_savings",
+                "estimated_savings_pct",
+            ],
+        )
+        if write_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "date": sim_date,
+                "day_index": summary.get("day_index"),
+                "llm_agents_enabled": summary.get("llm_agents_enabled"),
+                "anomaly_detected": summary.get("anomaly_detected"),
+                "max_state_imbalance_mw": summary.get("max_state_imbalance_mw"),
+                "estimated_baseline_cost": summary.get("estimated_baseline_cost"),
+                "estimated_llm_cost": summary.get("estimated_llm_cost"),
+                "estimated_savings": summary.get("estimated_savings"),
+                "estimated_savings_pct": summary.get("estimated_savings_pct"),
+            }
+        )
 
 
 def load_simulation_config() -> Dict[str, Any]:
@@ -262,10 +346,43 @@ def run_simulation() -> None:
     all_phase8_summaries: List[Dict[str, Any]] = []
     all_memory_events: List[Dict[str, Any]] = []  # Track memory write events
     last_ledger: dict[str, Any] = {}
+    all_xai_daily_ledgers: List[Dict[str, Any]] = []
+    orchestration_daily: List[Dict[str, Any]] = []
+
+    audit_ledger_builder = XAIDailyAuditLedger()
+    orchestration_engine = OrchestrationEngine()
 
     for day in range(simulation_days):
         sim_date = (date.today() + timedelta(days=day)).isoformat()
         print(f"\nDAY {day + 1} - {sim_date}")
+        output_dir = Path("outputs")
+
+        baseline_day = _load_baseline_day(day, output_dir)
+        delta_event = _build_delta_event_from_context(contexts)
+        orchestration_summary = orchestration_engine.evaluate_day(
+            day_index=day,
+            baseline_day=baseline_day,
+            delta_event=delta_event,
+        ).to_dict()
+        orchestration_summary["estimated_savings"] = round(
+            float(orchestration_summary["estimated_llm_cost"])
+            - float(orchestration_summary["estimated_baseline_cost"]),
+            4,
+        )
+        orchestration_summary["estimated_savings_pct"] = round(
+            (
+                (orchestration_summary["estimated_savings"] / orchestration_summary["estimated_llm_cost"]) * 100.0
+                if orchestration_summary["estimated_llm_cost"] > 0
+                else 0.0
+            ),
+            2,
+        )
+        orchestration_daily.append(orchestration_summary)
+        _append_cost_savings_row(
+            output_dir=output_dir,
+            sim_date=sim_date,
+            summary=orchestration_summary,
+        )
         
         # === MEMORY READ: Display current memory state at start of day ===
         current_memory = unified_orchestrator.get_memory_state()
@@ -614,6 +731,37 @@ def run_simulation() -> None:
                     f"MEMORY_WRITE | {memory_warning[:80]}..."
                 ]
 
+        xai_trace_path = None
+
+        daily_ledger_payload = audit_ledger_builder.build(
+            sim_date=sim_date,
+            day_index=day,
+            initial_deficits=day_initial_deficit_states,
+            dr_activated_mw=day_dr_total_activated_mw,
+            dr_savings_inr=day_dr_total_savings_inr,
+            executed_trades=[
+                {
+                    "buyer_state": t.buyer_state,
+                    "seller_state": t.seller_state,
+                    "requested_mw": float(t.requested_mw),
+                    "approved_mw": float(t.approved_mw),
+                    "reason": t.reason,
+                }
+                for t in phase7_result.executed_trades
+            ],
+            load_shedding=phase7_result.load_shedding_mw,
+            memory_warning=memory_warning,
+            memory_state=unified_orchestrator.get_memory_state(),
+            frequency_before_hz=phase7_result.grid_frequency_before_hz,
+            frequency_after_hz=phase7_result.grid_frequency_after_hz,
+            xai_phase_trace_path=xai_trace_path,
+            baseline_day=baseline_day,
+            delta_event=delta_event,
+        )
+        all_xai_daily_ledgers.append(daily_ledger_payload)
+        ledger_path = output_dir / f"audit_ledger_{sim_date}_day{day + 1:03d}.json"
+        ledger_path.write_text(json.dumps(daily_ledger_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
         env.advance_day()
 
     # Log final memory state
@@ -634,6 +782,8 @@ def run_simulation() -> None:
         phase8_summaries=all_phase8_summaries,
         settlement_ledger=last_ledger,
         memory_events=all_memory_events,
+        xai_daily_ledgers=all_xai_daily_ledgers,
+        orchestration_daily=orchestration_daily,
     )
 
     print("\nSIMULATION COMPLETE")
@@ -650,6 +800,8 @@ def write_simulation_result(
     phase8_summaries: List[Dict[str, Any]],
     settlement_ledger: Dict[str, Any],
     memory_events: List[Dict[str, Any]] | None = None,
+    xai_daily_ledgers: List[Dict[str, Any]] | None = None,
+    orchestration_daily: List[Dict[str, Any]] | None = None,
 ) -> None:
     output = []
     for record in dispatches_all_days:
@@ -713,6 +865,8 @@ def write_simulation_result(
         "settlement_ledger": settlement_ledger,
         "summary": summary,
         "short_term_memory_events": memory_events or [],
+        "xai_daily_ledgers": xai_daily_ledgers or [],
+        "orchestration_daily": orchestration_daily or [],
     }
 
     out_path = Path("outputs") / f"simulation_result_{date.today().isoformat()}.json"

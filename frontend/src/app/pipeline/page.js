@@ -312,7 +312,7 @@ export default function PipelinePage() {
                 DATA PIPELINE
               </h1>
               <p className="text-grid-textDim text-sm max-w-xl">
-                Unified intelligence pipeline with explainable AI. See exactly how data flows from raw sources to actionable insights.
+                Human-readable 4-stage grid workflow: A Priori Planner, Intelligence Delta Trigger, Strict Waterfall Routing, and Self-Healing Memory.
               </p>
             </div>
             
@@ -489,24 +489,20 @@ export default function PipelinePage() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  How This Pipeline Works
+                  End-to-End Stage Narrative
                 </h3>
                 <div className="text-sm text-grid-text leading-relaxed space-y-3">
                   <p>
-                    <strong className="text-cyan-400">1. Intelligence Check:</strong> The system first checks if we have valid AI-generated intelligence data in the cache. 
-                    This includes demand forecasts, risk assessments, and event detection for each grid region.
+                    <strong className="text-cyan-400">Stage 1 - A Priori Planner:</strong> LightGBM generates baseline demand/supply expectations for all states and decides if LLM agents should stay asleep.
                   </p>
                   <p>
-                    <strong className="text-purple-400">2. Intelligence Generation:</strong> If missing or stale, the SmartGridIntelligenceAgent runs. 
-                    It scrapes news, calls weather APIs, and uses LLM reasoning to synthesize grid multipliers.
+                    <strong className="text-purple-400">Stage 2 - Intelligence Extraction:</strong> The Intelligence agent detects anomalies and computes Delta. If Delta is zero, the day remains baseline-only.
                   </p>
                   <p>
-                    <strong className="text-green-400">3. Grid Status Loading:</strong> Physical grid topology (nodes, edges, power flows) is loaded 
-                    and combined with intelligence multipliers to create an enhanced real-time view.
+                    <strong className="text-green-400">Stage 3 - Strict Waterfall Orchestrator:</strong> Deficits are resolved in non-negotiable order: battery first, DR auction second, transmission third, controlled fallback last.
                   </p>
                   <p>
-                    <strong className="text-amber-400">4. Simulation Ready:</strong> With all data synchronized, you can run market clearing simulations 
-                    where agents negotiate power trades based on current conditions and AI forecasts.
+                    <strong className="text-amber-400">Stage 4 - Self-Healing Memory + XAI:</strong> The system writes a daily audit ledger and short-term memory warning so tomorrow's routing avoids repeated bottlenecks.
                   </p>
                 </div>
               </div>

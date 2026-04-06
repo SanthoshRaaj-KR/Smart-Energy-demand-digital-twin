@@ -1,12 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, Brain, 
   Newspaper, Cloud, Filter, Cpu, FileText, Gauge, Zap
 } from 'lucide-react'
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+import { useXAIAuditLedger } from '@/hooks/useApi'
 
 const PHASE_ICONS = {
   phase_1_data_fetch: Cloud,
@@ -32,18 +31,32 @@ function PhaseCard({ phaseKey, phase, isExpanded, onToggle }) {
   const Icon = PHASE_ICONS[phaseKey] || Brain
   const color = PHASE_COLORS[phaseKey] || 'cyan'
   const isCompleted = phase.status === 'completed'
+  const styleMap = {
+    cyan: { border: 'rgba(34,211,238,0.3)', bg: 'rgba(34,211,238,0.05)', chipBg: 'rgba(34,211,238,0.2)', icon: '#22d3ee' },
+    purple: { border: 'rgba(168,85,247,0.3)', bg: 'rgba(168,85,247,0.05)', chipBg: 'rgba(168,85,247,0.2)', icon: '#c084fc' },
+    orange: { border: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.05)', chipBg: 'rgba(249,115,22,0.2)', icon: '#fb923c' },
+    blue: { border: 'rgba(59,130,246,0.3)', bg: 'rgba(59,130,246,0.05)', chipBg: 'rgba(59,130,246,0.2)', icon: '#60a5fa' },
+    green: { border: 'rgba(34,197,94,0.3)', bg: 'rgba(34,197,94,0.05)', chipBg: 'rgba(34,197,94,0.2)', icon: '#4ade80' },
+    pink: { border: 'rgba(236,72,153,0.3)', bg: 'rgba(236,72,153,0.05)', chipBg: 'rgba(236,72,153,0.2)', icon: '#f472b6' },
+    yellow: { border: 'rgba(234,179,8,0.3)', bg: 'rgba(234,179,8,0.05)', chipBg: 'rgba(234,179,8,0.2)', icon: '#facc15' },
+  }
+  const style = styleMap[color] || styleMap.cyan
 
   return (
-    <div className={`border rounded-lg overflow-hidden transition-all duration-200 ${
-      isCompleted ? `border-${color}-500/30 bg-${color}-500/5` : 'border-grid-border/30 bg-grid-bg/50'
-    }`}>
+    <div
+      className="border rounded-lg overflow-hidden transition-all duration-200"
+      style={{
+        borderColor: isCompleted ? style.border : 'rgba(71,85,105,0.3)',
+        background: isCompleted ? style.bg : 'rgba(10,22,40,0.5)',
+      }}
+    >
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-${color}-500/20`}>
-            <Icon className={`w-4 h-4 text-${color}-400`} />
+          <div className="p-2 rounded-lg" style={{ background: style.chipBg }}>
+            <Icon className="w-4 h-4" style={{ color: style.icon }} />
           </div>
           <div>
             <div className="font-medium text-white text-sm">{phase.name}</div>
@@ -322,30 +335,79 @@ function RiskBadge({ label, risk }) {
 }
 
 export function XAIAuditPanel({ regionId }) {
-  const [audit, setAudit] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [expandedPhases, setExpandedPhases] = useState(new Set(['phase_7_multiplier_synthesis']))
-
-  useEffect(() => {
-    if (!regionId) return
-
-    async function fetchAudit() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await fetch(`${BASE_URL}/api/intelligence/${regionId}/audit`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        setAudit(data)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+  const { data: dailyLedger, loading, error } = useXAIAuditLedger()
+  const audit = useMemo(() => {
+    if (!dailyLedger?.phases?.length) return null
+    return {
+      city: regionId || 'GRID',
+      generated_at: dailyLedger.generated_at,
+      phases: {
+        phase_1_data_fetch: {
+          name: 'Stage 1: A Priori Planner',
+          description: dailyLedger.phases[0]?.result || '',
+          status: 'completed',
+          raw_headline_count: 0,
+          phase_1_grid_events: [],
+          weather_snapshot: {},
+        },
+        phase_2_city_intel: {
+          name: 'Stage 2: Intelligence Extraction',
+          description: dailyLedger.phases[1]?.result || '',
+          status: 'completed',
+          llm_confidence: 1.0,
+          key_vulnerabilities: [],
+          primary_fuel_sources: [],
+        },
+        phase_3_event_radar: {
+          name: 'Stage 3: Waterfall (Temporal+Economic)',
+          description: dailyLedger.phases[2]?.result || '',
+          status: 'completed',
+          event_count: 1,
+          events: [{
+            event_name: 'Deficit Resolution',
+            severity: dailyLedger.summary?.load_shedding_mw > 0 ? 'MEDIUM' : 'LOW',
+            grid_mechanism: dailyLedger.phases[2]?.execution || '',
+            est_mw_impact: dailyLedger.summary?.initial_total_deficit_mw || 0,
+          }],
+        },
+        phase_4_headline_filter: {
+          name: 'Stage 3: Waterfall (Spatial)',
+          description: dailyLedger.phases[3]?.result || '',
+          status: 'completed',
+          input_count: dailyLedger.phases[3]?.details?.executed_trades?.length || 0,
+          output_count: dailyLedger.phases[3]?.details?.executed_trades?.length || 0,
+        },
+        phase_5_signal_extraction: {
+          name: 'Stage 3: Waterfall (Fallback)',
+          description: dailyLedger.phases[4]?.result || '',
+          status: 'completed',
+          extracted_signals: dailyLedger.phases[4]?.execution || '',
+        },
+        phase_6_impact_narrative: {
+          name: 'Stage 4: Settlement + Trace',
+          description: dailyLedger.phases[5]?.result || '',
+          status: 'completed',
+          narrative: dailyLedger.phases[5]?.execution || '',
+        },
+        phase_7_multiplier_synthesis: {
+          name: 'Stage 4: Self-Healing Memory',
+          description: dailyLedger.phases[6]?.result || '',
+          status: 'completed',
+          final_multipliers: {
+            economic_demand_multiplier: 1.0,
+            generation_capacity_multiplier: 1.0,
+            temperature_anomaly: 0.0,
+            seven_day_demand_forecast_mw_delta: dailyLedger.summary?.initial_total_deficit_mw || 0,
+            demand_spike_risk: dailyLedger.summary?.load_shedding_mw > 0 ? 'MEDIUM' : 'LOW',
+            supply_shortfall_risk: dailyLedger.summary?.load_shedding_mw > 0 ? 'MEDIUM' : 'LOW',
+            confidence: 1.0,
+            key_driver: 'Daily XAI Audit Ledger',
+          },
+        },
+      },
     }
-    fetchAudit()
-  }, [regionId])
+  }, [dailyLedger, regionId])
 
   const togglePhase = (phaseKey) => {
     setExpandedPhases(prev => {
@@ -379,7 +441,7 @@ export function XAIAuditPanel({ regionId }) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-red-400">
         <AlertTriangle className="w-6 h-6 mb-2" />
-        <div className="text-sm">Failed to load audit: {error}</div>
+        <div className="text-sm">Failed to load audit: {String(error)}</div>
       </div>
     )
   }

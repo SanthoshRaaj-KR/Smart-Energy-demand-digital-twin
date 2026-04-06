@@ -6,21 +6,25 @@ import { usePipeline, STAGES } from '@/hooks/usePipeline'
 import { PipelineStatusBar } from '@/components/ui/PipelineExplainer'
 import { SimTerminal } from '@/components/grid/SimTerminal'
 import { AgentChat } from '@/components/agents/AgentChat'
+import { XAIAuditPanel } from '@/components/agents/XAIAuditPanel'
 import { GridMap } from '@/components/grid/GridMap'
 import { DispatchTable } from '@/components/grid/DispatchTable'
 import { DispatcherRadar } from '@/components/grid/DispatcherRadar'
 import { Card, SectionLabel, Badge } from '@/components/ui/Primitives'
+import { useCostSavings } from '@/hooks/useApi'
 
 const TABS = [
   { id: 'terminal', label: 'Terminal', icon: Zap },
   { id: 'agents', label: 'Agents', icon: MessageSquare },
   { id: 'grid', label: 'Grid View', icon: Network },
   { id: 'results', label: 'Dispatch', icon: BarChart2 },
+  { id: 'xai', label: 'XAI Ledger', icon: Brain },
 ]
 
 export default function SimulationPage() {
   const { logs, results, running, done, runSimulation } = useSimulation()
   const { data: gridStatus } = useGridStatus()
+  const { data: costSavings } = useCostSavings()
   const [activeTab, setActiveTab] = useState('terminal')
   
   // Pipeline integration
@@ -98,6 +102,20 @@ export default function SimulationPage() {
             onExpand={() => {}}
           />
         </div>
+
+        <Card className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-grid-textDim">Two-Tier Orchestrator Savings</div>
+              <div className="text-xl font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                {costSavings?.summary?.estimated_savings_pct ?? 0}% estimated savings
+              </div>
+            </div>
+            <Badge variant="cyan">
+              LLM Sleep Days: {costSavings?.summary?.llm_sleep_days ?? 0}
+            </Badge>
+          </div>
+        </Card>
         
         {/* Pipeline Warning if not ready */}
         {!canRunSimulation && !running && (
@@ -315,6 +333,15 @@ export default function SimulationPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'xai' && (
+          <div className="space-y-4">
+            <SectionLabel>7-Phase XAI Daily Ledger</SectionLabel>
+            <Card>
+              <XAIAuditPanel regionId="GRID" />
+            </Card>
           </div>
         )}
       </div>

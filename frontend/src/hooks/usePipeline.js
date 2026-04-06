@@ -6,11 +6,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 // Pipeline stages
 export const STAGES = {
   IDLE: 'idle',
-  CHECKING_INTELLIGENCE: 'checking_intelligence',
-  INTELLIGENCE_MISSING: 'intelligence_missing',
-  GENERATING_INTELLIGENCE: 'generating_intelligence',
-  LOADING_GRID: 'loading_grid',
-  LOADING_SIMULATION: 'loading_simulation',
+  CHECKING_INTELLIGENCE: 'checking_intelligence', // Stage 1/2 gate
+  INTELLIGENCE_MISSING: 'intelligence_missing',   // Stage 2 missing
+  GENERATING_INTELLIGENCE: 'generating_intelligence', // Stage 2 generation
+  LOADING_GRID: 'loading_grid', // Stage 3 context load
+  LOADING_SIMULATION: 'loading_simulation', // Stage 4 readiness
   READY: 'ready',
   ERROR: 'error',
 }
@@ -24,43 +24,43 @@ export const STAGE_META = {
     color: '#6b7280',
   },
   [STAGES.CHECKING_INTELLIGENCE]: {
-    label: 'Checking Intelligence',
-    description: 'Verifying if AI-generated regional intelligence data exists in cache',
+    label: 'Stage 1/2 Gate',
+    description: 'Checking baseline intelligence and whether Delta workflow must wake',
     explanation: 'The system checks if we have recent AI analysis for each grid region (Bihar, UP, West Bengal, Karnataka). This intelligence includes demand forecasts, risk assessments, and event detection.',
     icon: 'Search',
     color: '#3b82f6',
   },
   [STAGES.INTELLIGENCE_MISSING]: {
-    label: 'Intelligence Missing',
-    description: 'No cached intelligence found - generation required',
+    label: 'Stage 2 Missing',
+    description: 'No valid intelligence cache - generation is required',
     explanation: 'The AI intelligence cache is empty or stale. This could mean it\'s the first run, or the data is outdated. Generation involves real-time web scraping, weather API calls, and LLM analysis.',
     icon: 'AlertTriangle',
     color: '#f59e0b',
   },
   [STAGES.GENERATING_INTELLIGENCE]: {
-    label: 'Generating Intelligence',
-    description: 'Running AI agents to gather and analyze regional data',
+    label: 'Stage 2 Intelligence',
+    description: 'Generating anomaly and Delta context from AI agents',
     explanation: 'The SmartGridIntelligenceAgent is now active. It\'s scanning news sources, checking weather forecasts, analyzing economic indicators, and using LLM reasoning to synthesize grid multipliers for each region.',
     icon: 'Brain',
     color: '#8b5cf6',
   },
   [STAGES.LOADING_GRID]: {
-    label: 'Loading Grid Status',
-    description: 'Fetching current grid topology and applying intelligence multipliers',
+    label: 'Stage 3 Waterfall Context',
+    description: 'Loading topology and routing context for strict waterfall execution',
     explanation: 'Loading the physical grid state (nodes, edges, power flows) and applying the AI-generated multipliers. This combines static grid physics with dynamic intelligence context.',
     icon: 'Network',
     color: '#06b6d4',
   },
   [STAGES.LOADING_SIMULATION]: {
-    label: 'Loading Simulation Data',
-    description: 'Checking for existing simulation results',
+    label: 'Stage 4 Readiness',
+    description: 'Loading simulation + XAI artifacts for human review',
     explanation: 'Looking for previous dispatch simulation results. If found, they\'ll be displayed immediately. You can always run a fresh simulation from the War Room.',
     icon: 'Zap',
     color: '#10b981',
   },
   [STAGES.READY]: {
     label: 'Pipeline Ready',
-    description: 'All data loaded and synchronized',
+    description: 'All stages available for simulation and XAI audit',
     explanation: 'The complete data pipeline is operational. Intelligence is cached, grid status is live, and you\'re ready to run simulations or analyze regional data.',
     icon: 'CheckCircle',
     color: '#22c55e',

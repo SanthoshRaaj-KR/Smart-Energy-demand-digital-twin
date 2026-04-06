@@ -3,8 +3,10 @@
 from datetime import date
 import json
 from pathlib import Path
+import csv
 
 from src.agents.intelligence_agent.orchestrator import SmartGridIntelligenceAgent
+from src.orchestration.engine import OrchestrationEngine
 
 BACKEND_DIR = Path(__file__).resolve().parent
 OUTPUTS_DIR = BACKEND_DIR / "outputs"
@@ -420,10 +422,30 @@ def main() -> None:
     
     # STAGE 1: A Priori Planning
     baseline = generate_baseline_schedule()
+    baseline_day = (baseline.get("schedule") or [{}])[0]
     
     # STAGE 2: Intelligence (anomaly detection)
     print("\nSTAGE 2: Intelligence extraction...")
     intelligence = generate_intelligence()
+    any_wake = any(
+        data.get("deviation_result", {}).get("should_wake_orchestrator", False)
+        for data in intelligence.values()
+    )
+
+    engine = OrchestrationEngine()
+    day_summary = engine.evaluate_day(
+        day_index=0,
+        baseline_day=baseline_day,
+        delta_event={"anomaly": True} if any_wake else None,
+    )
+    append_cost_savings(
+        day_index=0,
+        llm_agents_enabled=day_summary.llm_agents_enabled,
+        anomaly_detected=day_summary.anomaly_detected,
+        max_state_imbalance_mw=day_summary.max_state_imbalance_mw,
+        baseline_cost=day_summary.estimated_baseline_cost,
+        llm_cost=day_summary.estimated_llm_cost,
+    )
     
     # STAGE 3: Waterfall Orchestration
     waterfall = execute_waterfall_demo(day_index=0, date_str="2025-01-01")
@@ -467,3 +489,47 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def append_cost_savings(
+    day_index: int,
+    llm_agents_enabled: bool,
+    anomaly_detected: bool,
+    max_state_imbalance_mw: float,
+    baseline_cost: float,
+    llm_cost: float,
+) -> None:
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = OUTPUTS_DIR / "api_cost_savings.csv"
+    write_header = not csv_path.exists()
+    savings = llm_cost - baseline_cost
+    savings_pct = (savings / llm_cost * 100.0) if llm_cost > 0 else 0.0
+
+    with csv_path.open("a", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "date",
+                "day_index",
+                "llm_agents_enabled",
+                "anomaly_detected",
+                "max_state_imbalance_mw",
+                "estimated_baseline_cost",
+                "estimated_llm_cost",
+                "estimated_savings",
+                "estimated_savings_pct",
+            ],
+        )
+        if write_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "date": date.today().isoformat(),
+                "day_index": day_index,
+                "llm_agents_enabled": llm_agents_enabled,
+                "anomaly_detected": anomaly_detected,
+                "max_state_imbalance_mw": round(max_state_imbalance_mw, 2),
+                "estimated_baseline_cost": round(baseline_cost, 4),
+                "estimated_llm_cost": round(llm_cost, 4),
+                "estimated_savings": round(savings, 4),
+                "estimated_savings_pct": round(savings_pct, 2),
+            }
+        )

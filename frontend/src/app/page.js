@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
-import { Activity, Cpu, GitBranch, Zap, BarChart2, CloudLightning, ChevronRight, Workflow } from 'lucide-react'
+import { Activity, Cpu, GitBranch, Zap, BarChart2, CloudLightning, ChevronRight, Workflow, ShieldCheck, Brain } from 'lucide-react'
 import Link from 'next/link'
 import { ForecastChart } from '@/components/charts/ForecastChart'
 import { GridMap } from '@/components/grid/GridMap'
@@ -11,22 +11,22 @@ import { REGIONS } from '@/lib/gridMeta'
 
 const FEATURE_CARDS = [
   {
-    icon: Cpu,
+    icon: Brain,
     color: '#00d4ff',
-    title: 'Hybrid ML/AI Forecasting',
-    body: 'Live demand and intelligence context are fused into a short horizon projection for each region.',
+    title: 'Stage 1 + 2 Intelligence Gate',
+    body: 'LightGBM prepares the baseline; LLM agents wake only when Delta anomalies break that baseline.',
   },
   {
     icon: GitBranch,
     color: '#0066ff',
-    title: 'Agentic Market Clearing',
-    body: 'State, Routing, and Fusion agents clear demand and supply via simulation dispatch flow.',
+    title: 'Stage 3 Waterfall Routing',
+    body: 'Deficits are resolved in strict order: Battery, DR Auction, BFS Transmission, then controlled fallback.',
   },
   {
-    icon: CloudLightning,
+    icon: ShieldCheck,
     color: '#10b981',
-    title: 'Climate-Aware Dispatch',
-    body: 'Weather and risk flags are propagated into the trading and balancing loop through backend intelligence.',
+    title: 'Stage 4 Self-Healing XAI',
+    body: 'A human-readable 7-phase audit ledger explains daily decisions and memory warnings for next-day adaptation.',
   },
 ]
 
@@ -189,7 +189,7 @@ export default function HomePage() {
               </h1>
 
               <p className="text-grid-textDim text-base leading-relaxed mb-8 max-w-lg">
-                Real-time simulation platform integrating live grid status, intelligence multipliers, and agent-based dispatch execution.
+                A phase-by-phase Smart Grid digital twin: forecast baseline, detect deltas, route deficits, and learn from failures with explainable ledgers.
               </p>
 
               <div className="flex flex-wrap gap-3">
@@ -197,27 +197,27 @@ export default function HomePage() {
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
                   style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)', fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, letterSpacing: '0.05em' }}>
                   <Workflow className="w-4 h-4" />
-                  Data Pipeline
+                  Stage-by-Stage Pipeline
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
                 <Link href="/intelligence"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
                   style={{ background: 'rgba(0,212,255,0.1)', color: '#00d4ff', border: '1px solid rgba(0,212,255,0.2)', fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, letterSpacing: '0.05em' }}>
                   <Activity className="w-4 h-4" />
-                  View Intelligence
+                  Delta Intelligence
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
                 <Link href="/simulation"
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
                   style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', fontFamily: 'Rajdhani, sans-serif', fontWeight: 600, letterSpacing: '0.05em' }}>
                   <Zap className="w-4 h-4" />
-                  War Room
+                  Waterfall + XAI
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
 
               <div className="flex flex-wrap gap-2 mt-6">
-                {['LightGBM', 'FastAPI', 'LLM Agents', 'Real-time', 'Carbon-Aware'].map(tag => (
+                {['Stage 1 Planner', 'Stage 2 Delta', 'Stage 3 Waterfall', 'Stage 4 Memory', 'XAI Ledger'].map(tag => (
                   <span key={tag} className="text-[9px] px-2 py-0.5 rounded border border-grid-border/60 text-grid-textDim"
                     style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
                     {tag}
