@@ -23,6 +23,7 @@ from src.agents.routing_agent.phase5_incident_dispatcher_agent import Phase5Inci
 from src.agents.routing_agent.phase6_negotiation_agent import Phase6NegotiationAgent
 from src.agents.routing_agent.phase7_syndicate_agent import Phase7SyndicateAgent
 from src.agents.routing_agent.phase8_xai_agent import Phase8XAIAgent
+from src.agents.routing_agent.unified_routing_orchestrator import UnifiedRoutingOrchestrator
 from src.agents.routing_agent.settlement import SettlementAgent
 from src.agents.routing_agent.syndicate_xai import SyndicateXAI
 from src.agents.fusion_agent.inference import load_artefacts, predict_all_regions
@@ -243,6 +244,14 @@ def run_simulation() -> None:
     phase6_negotiation_agent = Phase6NegotiationAgent()
     phase7_syndicate_agent = Phase7SyndicateAgent()
     phase8_xai_agent = Phase8XAIAgent()
+    
+    # === UNIFIED ROUTING ORCHESTRATOR WITH SHORT-TERM WORKING MEMORY ===
+    # Wraps Phase 6 and Phase 7 agents with a 72-hour sliding window memory buffer
+    unified_orchestrator = UnifiedRoutingOrchestrator(
+        phase6_agent=phase6_negotiation_agent,
+        phase7_agent=phase7_syndicate_agent,
+    )
+    print("[INIT] UnifiedRoutingOrchestrator initialized with Short-Term Working Memory (max 3 days)")
 
     all_dispatches: List[DispatchRecord] = []
     all_load_shedding: List[dict[str, Any]] = []
@@ -251,11 +260,21 @@ def run_simulation() -> None:
     all_phase_logs: Dict[str, List[str]] = {}
     all_phase7_final_states: List[Dict[str, Any]] = []
     all_phase8_summaries: List[Dict[str, Any]] = []
+    all_memory_events: List[Dict[str, Any]] = []  # Track memory write events
     last_ledger: dict[str, Any] = {}
 
     for day in range(simulation_days):
         sim_date = (date.today() + timedelta(days=day)).isoformat()
         print(f"\nDAY {day + 1} - {sim_date}")
+        
+        # === MEMORY READ: Display current memory state at start of day ===
+        current_memory = unified_orchestrator.get_memory_state()
+        if current_memory:
+            print(f"  [STWM] Grid Short-Term Memory ({len(current_memory)}/{unified_orchestrator.MEMORY_WINDOW_SIZE} slots):")
+            for i, mem in enumerate(current_memory, 1):
+                print(f"    [{i}] {mem}")
+        
+        # Legacy warnings from phase7 agent (for backwards compatibility)
         rag_warnings = phase7_syndicate_agent.warnings_for_day(day_index=day)
         if rag_warnings:
             for warning in rag_warnings:
@@ -362,6 +381,7 @@ def run_simulation() -> None:
             print(f"  PHASE5: incident derating applied to {impacted_count} edges")
 
         # Phase 6: schema-bound negotiation with safety override preview.
+        # === USING UNIFIED ORCHESTRATOR WITH MEMORY READ LOOP ===
         deficit_states = {
             nid: float(pos.deficit_mw)
             for nid, pos in state_positions.items()
@@ -373,11 +393,16 @@ def run_simulation() -> None:
             if float(pos.surplus_mw) > 0.0 and not bool(pos.pre_event_hoard)
         }
         daily_edge_capacities = {k: float(v.capacity_mw) for k, v in env.edges.items()}
-        phase6_output = phase6_negotiation_agent.propose_trades(
+        
+        # Store edge capacities at start of day for memory evaluation
+        edge_capacities_at_start = dict(daily_edge_capacities)
+        
+        # === MEMORY READ: Use unified orchestrator for spatial routing ===
+        # This injects the short-term memory into the negotiation prompt
+        phase6_output = unified_orchestrator.execute_spatial_routing(
             deficit_states_mw=deficit_states,
             available_surplus_states_mw=dict(available_surplus_states),
             daily_edge_capacities_mw=daily_edge_capacities,
-            memory_warnings=rag_warnings,
         )
         for trade in phase6_output.proposed_trades:
             all_phase_logs[trade.buyer_state] = all_phase_logs.get(trade.buyer_state, []) + [
@@ -389,13 +414,15 @@ def run_simulation() -> None:
             ]
 
         # Phase 7: execute approved trades with direct-neighbor fallback shedding.
-        phase7_result = phase7_syndicate_agent.execute(
+        # === USING UNIFIED ORCHESTRATOR FOR SYNDICATE EXECUTION ===
+        phase7_result = unified_orchestrator.execute_syndicate(
             proposed_trades=phase6_output.proposed_trades,
             deficit_states_mw=deficit_states,
             surplus_states_mw=available_surplus_states,
             daily_edge_capacities_mw=daily_edge_capacities,
             total_grid_capacity_mw=sum(base_generation.values()),
         )
+        # Legacy bottleneck recording (for backwards compatibility)
         phase7_syndicate_agent.record_bottlenecks(day_index=day, observed_bottlenecks=phase7_result.observed_bottlenecks)
         for trade in phase7_result.executed_trades:
             all_phase_logs[trade.buyer_state] = all_phase_logs.get(trade.buyer_state, []) + [
@@ -563,7 +590,38 @@ def run_simulation() -> None:
             simulation_date=sim_date,
         )
 
+        # =================================================================
+        # MEMORY WRITE LOOP: End-of-Day Evaluation
+        # =================================================================
+        # After execute_fallback / Load Shedding is complete, evaluate the
+        # grid's performance and write a memory log if failures occurred.
+        memory_warning = unified_orchestrator.evaluate_and_write_memory(
+            day_index=day,
+            date_str=sim_date,
+            phase7_result=phase7_result,
+            edge_capacities_at_start=edge_capacities_at_start,
+        )
+        if memory_warning:
+            all_memory_events.append({
+                "day": day + 1,
+                "date": sim_date,
+                "warning": memory_warning,
+                "memory_buffer_size": len(unified_orchestrator.get_memory_state()),
+            })
+            # Log to phase logs for each state that experienced issues
+            for state_id in phase7_result.load_shedding_mw.keys():
+                all_phase_logs[state_id] = all_phase_logs.get(state_id, []) + [
+                    f"MEMORY_WRITE | {memory_warning[:80]}..."
+                ]
+
         env.advance_day()
+
+    # Log final memory state
+    final_memory = unified_orchestrator.get_memory_state()
+    if final_memory:
+        print(f"\n[STWM] Final Memory State ({len(final_memory)} items):")
+        for i, mem in enumerate(final_memory, 1):
+            print(f"  [{i}] {mem}")
 
     write_simulation_result(
         dispatches_all_days=all_dispatches,
@@ -575,6 +633,7 @@ def run_simulation() -> None:
         phase7_final_states=all_phase7_final_states,
         phase8_summaries=all_phase8_summaries,
         settlement_ledger=last_ledger,
+        memory_events=all_memory_events,
     )
 
     print("\nSIMULATION COMPLETE")
@@ -590,6 +649,7 @@ def write_simulation_result(
     phase7_final_states: List[Dict[str, Any]],
     phase8_summaries: List[Dict[str, Any]],
     settlement_ledger: Dict[str, Any],
+    memory_events: List[Dict[str, Any]] | None = None,
 ) -> None:
     output = []
     for record in dispatches_all_days:
@@ -652,6 +712,7 @@ def write_simulation_result(
         "phase8_daily_summaries": phase8_summaries,
         "settlement_ledger": settlement_ledger,
         "summary": summary,
+        "short_term_memory_events": memory_events or [],
     }
 
     out_path = Path("outputs") / f"simulation_result_{date.today().isoformat()}.json"
