@@ -10,6 +10,13 @@ from .phase7_syndicate_agent import Phase7ExecutionResult, Phase7SyndicateAgent
 from .phase8_xai_agent import Phase8Summary, Phase8XAIAgent
 from .unified_routing_orchestrator import UnifiedRoutingOrchestrator, DailyMemoryContext
 
+# === Feature Sub-Agents (5 new specialised agents) ===
+from .negotiation_dialogue_agent import NegotiationDialogueAgent, DialogueEntry, DialogueTurn
+from .carbon_spatial_agent import CarbonSpatialAgent
+from .frequency_monitor_agent import FrequencyMonitorAgent
+from .parameter_autopsy_agent import ParameterAutopsyAgent
+from .event_flag_battery_agent import EventFlagBatteryAgent
+
 __all__ = [
     "RoutingAgent",
     "PathClimateAgent",
@@ -25,4 +32,12 @@ __all__ = [
     "Phase8XAIAgent",
     "UnifiedRoutingOrchestrator",
     "DailyMemoryContext",
+    # Feature agents
+    "NegotiationDialogueAgent",
+    "DialogueEntry",
+    "DialogueTurn",
+    "CarbonSpatialAgent",
+    "FrequencyMonitorAgent",
+    "ParameterAutopsyAgent",
+    "EventFlagBatteryAgent",
 ]

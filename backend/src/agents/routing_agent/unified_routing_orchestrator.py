@@ -28,6 +28,13 @@ from .phase6_negotiation_agent import Phase6NegotiationAgent, NegotiationOutput
 from .phase7_syndicate_agent import Phase7SyndicateAgent, Phase7ExecutionResult
 from ..shared.models import ProposedTrade
 
+# === Feature Sub-Agents ===
+from .negotiation_dialogue_agent import NegotiationDialogueAgent, DialogueEntry
+from .carbon_spatial_agent import CarbonSpatialAgent
+from .frequency_monitor_agent import FrequencyMonitorAgent
+from .lifeboat_protocol import LifeboatProtocol, GridState
+from .event_flag_battery_agent import EventFlagBatteryAgent
+
 
 @dataclass
 class WaterfallStepResult:
@@ -96,6 +103,20 @@ class UnifiedRoutingOrchestrator:
         # Internal tracking for bottleneck analysis
         self._last_day_bottlenecks: List[str] = []
         self._day_memory_log: List[Dict[str, Any]] = []
+
+        # === FEATURE 1: Agentic Negotiation Dialogue Log ===
+        self.dialogue_log: List[Dict[str, Any]] = []
+        self._dialogue_agent = NegotiationDialogueAgent()
+
+        # === FEATURE 2: DLR-Aware Carbon-Spatial Routing ===
+        self._carbon_spatial_agent = CarbonSpatialAgent()
+
+        # === FEATURE 3: Lifeboat Graph-Cut with Frequency Tracking ===
+        self._freq_monitor = FrequencyMonitorAgent()
+        self._lifeboat = LifeboatProtocol()
+
+        # === FEATURE 5: Event-Flag Battery Pre-Charge ===
+        self._event_flag_battery_agent = EventFlagBatteryAgent()
     
     # =========================================================================
     # READ LOOP: Memory Injection into Negotiation Prompts
@@ -412,6 +433,7 @@ INSTRUCTION: Factor these recent failures into your routing requests today. Do n
         dr_clearing_price: float = 6.0,
         day_index: int = 0,
         date_str: str = "",
+        intel_report: Optional[Dict[str, Any]] = None,
     ) -> WaterfallResult:
         """
         Execute the STRICT 4-step waterfall for deficit resolution.
@@ -456,23 +478,54 @@ INSTRUCTION: Factor these recent failures into your routing requests today. Do n
         current_deficit = dict(deficit_states_mw)
         current_surplus = dict(surplus_states_mw)
         current_battery_soc = dict(battery_soc)
-        
+
+        # === FEATURE 2: Apply DLR weather multipliers to edge capacities BEFORE waterfall ===
+        self._carbon_spatial_agent.clear_logs()
+        daily_edge_capacities_mw = self._carbon_spatial_agent.apply_dlr_weather_multipliers(
+            edge_caps=daily_edge_capacities_mw,
+            intel_report=intel_report,
+        )
+
+        # === FEATURE 5: Detect event-flag battery locks BEFORE Step 1 ===
+        self._event_flag_battery_agent.clear_log()
+        battery_locks = self._event_flag_battery_agent.get_locked_states(intel_report)
+
         # ===================================================================
         # STEP 1: TEMPORAL (Drain State Batteries)
         # ===================================================================
         print("\n[STEP 1/4] TEMPORAL: Draining state batteries...")
-        
+
         step1_resolved: Dict[str, float] = {}
         for state_id in list(current_deficit.keys()):
             deficit = current_deficit[state_id]
             available_battery = current_battery_soc.get(state_id, 0.0)
-            
-            if deficit > 0 and available_battery > 0:
-                discharge = min(deficit, available_battery)
+
+            # === FEATURE 5: Honour battery lock (stadium_surge etc.) ===
+            lock_type = battery_locks.get(state_id)
+            max_discharge = self._event_flag_battery_agent.compute_allowed_discharge(
+                state_id=state_id,
+                available_soc_mw=available_battery,
+                lock_type=lock_type,
+            )
+            if lock_type:
+                flag_name = self._event_flag_battery_agent.get_primary_flag(state_id, intel_report)
+                preserved = available_battery - max_discharge
+                self._event_flag_battery_agent.record_lock_applied(
+                    state_id=state_id,
+                    lock_type=lock_type,
+                    flag_triggered=flag_name,
+                    battery_soc_preserved_mw=preserved,
+                    deficit_not_resolved_mw=min(deficit, preserved),
+                )
+
+            if deficit > 0 and max_discharge > 0:
+                discharge = min(deficit, max_discharge)
                 current_deficit[state_id] -= discharge
                 current_battery_soc[state_id] -= discharge
                 step1_resolved[state_id] = discharge
                 print(f"  {state_id}: Discharged {discharge:.0f} MW from battery (SOC: {current_battery_soc[state_id]:.0f} MW remaining)")
+            elif deficit > 0 and lock_type:
+                print(f"  {state_id}: Battery LOCKED ({lock_type}) — {available_battery:.0f} MW preserved for evening surge")
         
         step1 = WaterfallStepResult(
             step_name="Temporal (Battery)",
@@ -531,14 +584,56 @@ INSTRUCTION: Factor these recent failures into your routing requests today. Do n
         # STEP 3: SPATIAL (Transmission Routing via BFS)
         # ===================================================================
         print("\n[STEP 3/4] SPATIAL: Routing power via transmission...")
-        
+
         # Use Phase 6 negotiation agent
         negotiation_output = self.execute_spatial_routing(
             deficit_states_mw=remaining_deficit_step2,
             available_surplus_states_mw=current_surplus,
             daily_edge_capacities_mw=daily_edge_capacities_mw,
         )
-        
+
+        # === FEATURE 2: Carbon BFS — re-rank proposed trades by carbon cost ===
+        carbon_reranked_trades = self._carbon_spatial_agent.apply_carbon_penalty(
+            proposed_trades=negotiation_output.proposed_trades,
+            edge_caps=daily_edge_capacities_mw,
+        )
+        # Replace the proposed trades with carbon-sorted version
+        from dataclasses import replace as dc_replace
+        negotiation_output = NegotiationOutput(proposed_trades=carbon_reranked_trades)
+
+        # === FEATURE 1: Generate agentic dialogue log for top trades ===
+        trade_tuples = [
+            (
+                t.buyer_state,
+                t.seller_state,
+                t.requested_mw,
+                float(daily_edge_capacities_mw.get((t.seller_state, t.buyer_state), 1000.0)),
+                t.approved_mw,
+            )
+            for t in negotiation_output.proposed_trades
+        ]
+        if trade_tuples:
+            carbon_contexts = {
+                (t.buyer_state, t.seller_state):
+                    self._carbon_spatial_agent.get_carbon_context_for_trade(t.buyer_state, t.seller_state)
+                for t in negotiation_output.proposed_trades
+            }
+            dlr_contexts = {
+                (t.buyer_state, t.seller_state):
+                    self._carbon_spatial_agent.get_dlr_context_for_trade(t.buyer_state, t.seller_state)
+                for t in negotiation_output.proposed_trades
+            }
+            dialogue_entries = self._dialogue_agent.generate_batch(
+                day_index=day_index,
+                date_str=date_str,
+                trades=trade_tuples,
+                carbon_contexts={k: v for k, v in carbon_contexts.items() if v},
+                dlr_contexts={k: v for k, v in dlr_contexts.items() if v},
+            )
+            for entry in dialogue_entries:
+                self.dialogue_log.append(entry.to_dict())
+            print(f"  [DIALOGUE] Generated {len(dialogue_entries)} agentic negotiation dialogue(s)")
+
         # Execute Phase 7 syndicate
         phase7_result = self.execute_syndicate(
             proposed_trades=negotiation_output.proposed_trades,
@@ -547,7 +642,7 @@ INSTRUCTION: Factor these recent failures into your routing requests today. Do n
             daily_edge_capacities_mw=daily_edge_capacities_mw,
             total_grid_capacity_mw=total_grid_capacity_mw,
         )
-        
+
         step3_resolved: Dict[str, float] = {}
         for trade in phase7_result.executed_trades:
             buyer = trade.buyer_state
@@ -573,18 +668,76 @@ INSTRUCTION: Factor these recent failures into your routing requests today. Do n
         if not remaining_deficit_step3:
             print("  ✅ All deficits resolved by transmission!")
             return self._finalize_waterfall(steps, current_deficit, {}, None)
-        
+
         # ===================================================================
         # STEP 4: FALLBACK (Load Shedding / Lifeboat Protocol)
         # ===================================================================
         print("\n[STEP 4/4] FALLBACK: Load shedding required...")
-        
+
+        # === FEATURE 3: Update grid frequency from unresolved deficit ===
+        total_unresolved = sum(remaining_deficit_step3.values())
+        self._freq_monitor.update_frequency(
+            unresolved_deficit_mw=total_unresolved,
+            day_index=day_index,
+            date_str=date_str,
+        )
+        current_freq = self._freq_monitor.get_current_frequency()
+        print(f"  [FREQUENCY] Grid frequency: {current_freq:.3f} Hz (unresolved={total_unresolved:.0f} MW)")
+
         load_shedding_mw: Dict[str, float] = {}
-        for state_id, deficit in remaining_deficit_step3.items():
-            if deficit > 0:
-                load_shedding_mw[state_id] = deficit
-                current_deficit[state_id] = 0.0
-                print(f"  ⚠️ {state_id}: Load shedding {deficit:.0f} MW (UNAVOIDABLE)")
+
+        # === FEATURE 3: Lifeboat trigger at <= 49.2 Hz ===
+        if self._freq_monitor.should_trigger_lifeboat():
+            print(f"  🚨 LIFEBOAT ARMED: {current_freq:.3f} Hz <= 49.2 Hz threshold!")
+            grid_state = GridState(
+                states=list(remaining_deficit_step3.keys()),
+                edges=dict(daily_edge_capacities_mw),
+                deficits=dict(remaining_deficit_step3),
+                surpluses=dict(current_surplus),
+                total_capacity_mw=total_grid_capacity_mw,
+            )
+            island_decision = self._lifeboat.evaluate(
+                grid=grid_state,
+                day_index=day_index,
+            )
+            if island_decision.should_island:
+                # Zero out sacrificed states' demand
+                for sac_state in island_decision.sacrificed_states:
+                    shed_amt = remaining_deficit_step3.get(sac_state, 0.0)
+                    load_shedding_mw[sac_state] = shed_amt
+                    current_deficit[sac_state] = 0.0
+                    # Also zero any surplus (island is cut off)
+                    current_surplus.pop(sac_state, None)
+                # Remove severed edges from capacities
+                for edge in island_decision.severed_edges:
+                    daily_edge_capacities_mw.pop(edge, None)
+                # Reset grid frequency for surviving network
+                self._freq_monitor.reset_after_island(
+                    sacrificed_states=island_decision.sacrificed_states,
+                    day_index=day_index,
+                    date_str=date_str,
+                )
+                print(f"  ✅ Lifeboat islanding executed. Frequency reset to 50.0 Hz.")
+                # Remaining non-sacrificed deficit → standard shedding
+                for state_id, deficit in remaining_deficit_step3.items():
+                    if state_id not in island_decision.sacrificed_states and deficit > 0:
+                        load_shedding_mw[state_id] = deficit
+                        current_deficit[state_id] = 0.0
+                        print(f"  ⚠️ {state_id}: Load shedding {deficit:.0f} MW (post-island residual)")
+            else:
+                # Lifeboat armed but no viable cut — standard shedding
+                for state_id, deficit in remaining_deficit_step3.items():
+                    if deficit > 0:
+                        load_shedding_mw[state_id] = deficit
+                        current_deficit[state_id] = 0.0
+                        print(f"  ⚠️ {state_id}: Load shedding {deficit:.0f} MW (no viable graph cut)")
+        else:
+            # Normal fallback — standard load shedding
+            for state_id, deficit in remaining_deficit_step3.items():
+                if deficit > 0:
+                    load_shedding_mw[state_id] = deficit
+                    current_deficit[state_id] = 0.0
+                    print(f"  ⚠️ {state_id}: Load shedding {deficit:.0f} MW (UNAVOIDABLE)")
         
         step4 = WaterfallStepResult(
             step_name="Fallback (Load Shedding)",

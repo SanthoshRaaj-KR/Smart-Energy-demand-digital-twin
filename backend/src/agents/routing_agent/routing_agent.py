@@ -15,13 +15,20 @@ from ..shared.models import Order, OrderType, DispatchRecord
 from .carbon_tariff import calculate_carbon_tax
 from .dispatch_window_agent import DispatchWindowAgent
 from .dlr_calculator import calculate_effective_capacity
-from .llm_safety_stub import verify_route_safety_with_llm
 from .path_climate_agent import PathClimateAgent
 from .route_score_agent import RouteScoreAgent
 from .dispatcher import DispatcherAgent
 from .syndicate_decider import SyndicateDecider
 
 logger = logging.getLogger(__name__)
+
+
+def verify_route_safety_with_llm(path: any) -> tuple[bool, str]:
+    """
+    Inline safety stub (replaces deleted llm_safety_stub.py).
+    Always approves routes — safety is enforced by DLR and Syndicate instead.
+    """
+    return True, "ROUTE_SAFE_DETERMINISTIC"
 
 
 @dataclass
