@@ -12,11 +12,16 @@ Run:
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import json
 from pathlib import Path
 
 from fastapi import Query
 
 from routes import app
+from routes import intelligence as legacy_intelligence
+from routes import grid_status as legacy_grid_status
+from routes import simulation_result as legacy_simulation_result
+from routes import demand_forecast as legacy_demand_forecast
 from engine import APrioriBrain
 from intelligence import StochasticTrigger
 from simulator import UnifiedOrchestrator
@@ -25,6 +30,48 @@ _BACKEND_DIR = Path(__file__).resolve().parent
 _BRAIN = APrioriBrain(_BACKEND_DIR)
 _TRIGGER = StochasticTrigger(_BACKEND_DIR)
 _SIMULATOR = UnifiedOrchestrator(_BACKEND_DIR)
+
+
+def _intelligence_cache_dir() -> Path:
+    return _BACKEND_DIR / "outputs" / "intelligence_cache"
+
+
+def _load_cache_file(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _summarize_cache(payload: dict) -> dict:
+    rows = payload.get("events", []) or []
+    multipliers = payload.get("state_multipliers", {}) or {}
+    return {
+        "day_index": payload.get("day_index"),
+        "date": payload.get("date"),
+        "generated_at": payload.get("generated_at"),
+        "state_count": len(rows),
+        "states": [r.get("state_id") for r in rows if r.get("state_id")],
+        "avg_multiplier": round(sum(multipliers.values()) / len(multipliers), 4) if multipliers else 1.0,
+        "scheduled_event_count": int(
+            payload.get("scheduled_events_summary", {}).get("total_events", 0)
+            if isinstance(payload.get("scheduled_events_summary", {}), dict)
+            else 0
+        ),
+    }
+
+
+def _get_cache_items() -> list[dict]:
+    cache_dir = _intelligence_cache_dir()
+    if not cache_dir.exists():
+        return []
+    items = []
+    for fp in sorted(cache_dir.glob("day_*.json"), key=lambda p: p.name):
+        try:
+            payload = _load_cache_file(fp)
+            summary = _summarize_cache(payload)
+            summary["file"] = fp.name
+            items.append(summary)
+        except Exception:
+            continue
+    return items
 
 
 @app.get("/api/v2/health")
@@ -126,6 +173,62 @@ def get_frequency_status():
         "status": "success",
         "summary": monitor.get_status_summary(),
         "event_log": monitor.get_log(),
+    }
+
+
+@app.get("/api/v2/pipeline-bundle")
+def get_pipeline_bundle(limit: int = Query(default=25, ge=1, le=200)):
+    """
+    Single integration payload for frontend pipeline route.
+    Bundles legacy pipeline data with v2 dialogue/frequency outputs.
+    """
+    dialogue = get_dialogue_log(limit=limit, day_index=-1)
+    frequency = get_frequency_status()
+    return {
+        "status": "success",
+        "data": {
+            "intelligence": legacy_intelligence(),
+            "grid_status": legacy_grid_status(),
+            "simulation_result": legacy_simulation_result(),
+            "forecast": legacy_demand_forecast(),
+            "dialogue_log": dialogue,
+            "frequency_status": frequency,
+            "intelligence_cache": {
+                "items": _get_cache_items(),
+            },
+        },
+    }
+
+
+@app.get("/api/v2/intelligence-cache")
+def get_intelligence_cache():
+    """
+    Return all available daily intelligence cache summaries.
+    Includes previous days if present in outputs/intelligence_cache/day_*.json.
+    """
+    items = _get_cache_items()
+    return {
+        "status": "success",
+        "total_days": len(items),
+        "items": items,
+    }
+
+
+@app.get("/api/v2/intelligence-cache/{day_index}")
+def get_intelligence_cache_day(day_index: int):
+    """
+    Return full intelligence cache payload for a specific day index.
+    """
+    cache_path = _intelligence_cache_dir() / f"day_{day_index:03d}.json"
+    if not cache_path.exists():
+        return {
+            "status": "error",
+            "message": f"Cache not found for day_index={day_index}",
+        }
+    payload = _load_cache_file(cache_path)
+    return {
+        "status": "success",
+        "data": payload,
     }
 
 

@@ -1,15 +1,17 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { 
-  Workflow, Brain, RefreshCw, CheckCircle, XCircle, 
-  AlertTriangle, Play, Pause, RotateCcw, ChevronRight,
-  Activity, Zap, Clock, TrendingUp, Shield
+  Brain, CheckCircle, XCircle, 
+  AlertTriangle, Play, ChevronRight,
+  Activity, Zap, Clock, TrendingUp, Shield, MessageSquare, Gauge
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePipeline, STAGES, STAGE_META } from '@/hooks/usePipeline'
-import { PipelineExplainer, PipelineFlow, PipelineStatusBar } from '@/components/ui/PipelineExplainer'
-import { Card, SectionLabel, Badge, StatBlock, ProgressBar } from '@/components/ui/Primitives'
+import { usePipeline, STAGE_META } from '@/hooks/usePipeline'
+import { PipelineExplainer } from '@/components/ui/PipelineExplainer'
+import { Card, SectionLabel, Badge, ProgressBar } from '@/components/ui/Primitives'
 import { REGIONS } from '@/lib/gridMeta'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 function DataQualityGauge({ label, value, max = 100, threshold = 70 }) {
   const pct = Math.round((value / max) * 100)
@@ -263,6 +265,12 @@ function StageHistoryTimeline({ history }) {
 export default function PipelinePage() {
   const pipeline = usePipeline({ autoStart: true })
   const [showHistory, setShowHistory] = useState(false)
+  const [dialogueEntries, setDialogueEntries] = useState([])
+  const [dialogueError, setDialogueError] = useState(null)
+  const [dialogueLoading, setDialogueLoading] = useState(false)
+  const [frequencyStatus, setFrequencyStatus] = useState(null)
+  const [frequencyError, setFrequencyError] = useState(null)
+  const [frequencyLoading, setFrequencyLoading] = useState(false)
   
   const {
     stage,
@@ -270,7 +278,6 @@ export default function PipelinePage() {
     error,
     intelligence,
     gridStatus,
-    simulation,
     stageHistory,
     isLoading,
     isReady,
@@ -280,6 +287,70 @@ export default function PipelinePage() {
     generateIntelligence,
     forceRegenerate,
   } = pipeline
+
+  useEffect(() => {
+    let cancelled = false
+
+    const fetchBackendV2Data = async () => {
+      if (!isReady) return
+
+      setDialogueLoading(true)
+      setFrequencyLoading(true)
+      setDialogueError(null)
+      setFrequencyError(null)
+
+      try {
+        const [dialogueRes, frequencyRes] = await Promise.all([
+          fetch(`${API_BASE}/api/v2/dialogue-log?limit=25`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/api/v2/frequency-status`, { cache: 'no-store' }),
+        ])
+
+        if (!dialogueRes.ok) {
+          throw new Error(`Dialogue API error: ${dialogueRes.status}`)
+        }
+        if (!frequencyRes.ok) {
+          throw new Error(`Frequency API error: ${frequencyRes.status}`)
+        }
+
+        const [dialogueJson, frequencyJson] = await Promise.all([
+          dialogueRes.json(),
+          frequencyRes.json(),
+        ])
+
+        if (!cancelled) {
+          setDialogueEntries(Array.isArray(dialogueJson.entries) ? dialogueJson.entries : [])
+          setFrequencyStatus(frequencyJson)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = err?.message || 'Failed to load backend v2 integration data'
+          if (message.startsWith('Dialogue API')) setDialogueError(message)
+          else if (message.startsWith('Frequency API')) setFrequencyError(message)
+          else {
+            setDialogueError(message)
+            setFrequencyError(message)
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setDialogueLoading(false)
+          setFrequencyLoading(false)
+        }
+      }
+    }
+
+    fetchBackendV2Data()
+    const intervalId = setInterval(fetchBackendV2Data, 10000)
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+    }
+  }, [isReady])
+
+  const latestDialogue = dialogueEntries[dialogueEntries.length - 1] || null
+  const latestTurns = Array.isArray(latestDialogue?.turns) ? latestDialogue.turns : []
+  const freqSummary = frequencyStatus?.summary || null
+  const freqEvents = Array.isArray(frequencyStatus?.event_log) ? frequencyStatus.event_log : []
 
   return (
     <div className="pt-14">
@@ -479,7 +550,82 @@ export default function PipelinePage() {
           <IntelligenceSummaryCard intelligence={intelligence} />
           <GridStatusCard gridStatus={gridStatus} />
         </div>
-        
+
+        <div className="grid lg:grid-cols-2 gap-6 mt-6">
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-purple-400" />
+                <h3 className="font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                  LLM Arguing (Backend v2)
+                </h3>
+              </div>
+              {dialogueLoading && <Badge variant="cyan">LOADING</Badge>}
+            </div>
+
+            {dialogueError ? (
+              <div className="text-sm text-red-400">{dialogueError}</div>
+            ) : !latestDialogue ? (
+              <div className="text-sm text-grid-textDim">No dialogue entries yet. Run simulation to populate `/api/v2/dialogue-log`.</div>
+            ) : latestTurns.length > 0 ? (
+              <div className="space-y-3">
+                {latestTurns.map((turn, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-white/5 border border-grid-border/20">
+                    <div className="text-[10px] uppercase tracking-wider text-purple-300 mb-1">
+                      {String(turn.role || `turn-${idx + 1}`)}
+                    </div>
+                    <div className="text-sm text-white leading-relaxed">
+                      {String(turn.message || turn.content || '')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-grid-textDim font-mono overflow-x-auto whitespace-pre-wrap break-words">
+                {JSON.stringify(latestDialogue, null, 2)}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-cyan-400" />
+                <h3 className="font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                  Frequency Status (Backend v2)
+                </h3>
+              </div>
+              {frequencyLoading && <Badge variant="cyan">LOADING</Badge>}
+            </div>
+
+            {frequencyError ? (
+              <div className="text-sm text-red-400">{frequencyError}</div>
+            ) : !freqSummary ? (
+              <div className="text-sm text-grid-textDim">Frequency summary not available yet.</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                    <div className="text-[10px] text-cyan-300 uppercase tracking-wider mb-1">Current Frequency</div>
+                    <div className="text-xl font-bold text-cyan-400" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                      {Number(freqSummary.current_frequency_hz || freqSummary.frequency_hz || 0).toFixed(3)} Hz
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <div className="text-[10px] text-amber-300 uppercase tracking-wider mb-1">Lifeboat Threshold</div>
+                    <div className="text-xl font-bold text-amber-400" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                      {Number(freqSummary.lifeboat_threshold_hz || freqSummary.threshold_hz || 0).toFixed(3)} Hz
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-grid-textDim">
+                  Event log entries: <span className="text-white font-medium">{freqEvents.length}</span>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+         
         {/* XAI Explanation Panel */}
         <div className="mt-8">
           <Card className="glow-cyan">
