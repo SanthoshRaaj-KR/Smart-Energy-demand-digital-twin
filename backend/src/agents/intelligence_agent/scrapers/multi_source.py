@@ -22,9 +22,15 @@ from threading import Lock
 from typing import Any, Dict, List, Optional, Set
 from urllib.parse import quote_plus, urlparse
 
-import feedparser
+try:
+    import feedparser
+except ModuleNotFoundError:  # pragma: no cover - runtime fallback
+    feedparser = None
 import requests
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ModuleNotFoundError:  # pragma: no cover - runtime fallback
+    BeautifulSoup = None
 
 # Disable SSL warnings for government sites with bad certificates
 import urllib3
@@ -38,6 +44,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ── Tier 1: Official Indian Grid & Government (highest trust, 0.95+)
 OFFICIAL_FEEDS: Dict[str, str] = {
     "Grid-India NLDC":     "https://grid-india.in/feed/",
+    "POSOCO Updates":      "https://www.posoco.in/feed/",
+    "PowerGrid India":     "https://www.powergrid.in/rss.xml",
     "NRLDC North":         "https://nrldc.in/feed/",
     "WRLDC West":          "https://wrldc.in/feed/",
     "SRLDC South":         "https://srldc.in/feed/",
@@ -98,6 +106,10 @@ GNEWS_RSS_QUERIES: Dict[str, str] = {
     "India floods heatwave":   "India+floods+heatwave+cyclone+weather",
     "India election":          "India+election+voting+BJP+Congress",
     "India subsidy tariff":    "India+electricity+tariff+subsidy+reform",
+    "POSOCO grid updates":     "POSOCO+NLDC+grid+advisory+India",
+    "PowerGrid transmission":  "PowerGrid+India+transmission+line+trip+corridor",
+    "Coal logistics India":    "India+coal+rake+rail+logistics+power+plant",
+    "LNG regas India":         "India+LNG+terminal+regasification+power+gas",
 }
 
 
@@ -167,7 +179,7 @@ class MultiSourceScraper:
     """
 
     MAX_ITEMS_PER_FEED = 20
-    REQUEST_TIMEOUT = 12
+    REQUEST_TIMEOUT = 10
     MAX_WORKERS = 12
 
     def __init__(self):
@@ -209,9 +221,9 @@ class MultiSourceScraper:
             completed = 0
             total = len(futures)
             try:
-                for future in as_completed(futures, timeout=60):  # 60 second total timeout
+                for future in as_completed(futures, timeout=10):  # 10 second total timeout
                     try:
-                        result = future.result(timeout=15)  # 15 second per-future timeout
+                        result = future.result(timeout=10)  # 10 second per-future timeout
                         articles.extend(result)
                         completed += 1
                         print(f"  Progress: {completed}/{total} feeds completed")
@@ -222,6 +234,10 @@ class MultiSourceScraper:
             except TimeoutError:
                 print(f"\n⏰ Time's up! Leaving {total - completed} slow websites behind and proceeding with {completed} feeds collected.")
                 print(f"   Collected {len(articles)} articles so far. Moving on...")
+                # Critical: cancel unfinished futures so executor doesn't block on exit.
+                for future in futures:
+                    if not future.done():
+                        future.cancel()
 
         # GDELT (sequential — single HTTP call)
         if include_gdelt:
@@ -265,9 +281,9 @@ class MultiSourceScraper:
             completed = 0
             total = len(futures)
             try:
-                for future in as_completed(futures, timeout=60):  # 60 second total timeout
+                for future in as_completed(futures, timeout=10):  # 10 second total timeout
                     try:
-                        result = future.result(timeout=15)  # 15 second per-future timeout
+                        result = future.result(timeout=10)  # 10 second per-future timeout
                         articles.extend(result)
                         completed += 1
                     except Exception as e:
@@ -276,6 +292,9 @@ class MultiSourceScraper:
                         completed += 1
             except TimeoutError:
                 print(f"\n⏰ Time's up! Leaving {total - completed} slow websites behind. Proceeding with {len(articles)} articles.")
+                for future in futures:
+                    if not future.done():
+                        future.cancel()
 
         articles.sort(key=lambda a: a.published, reverse=True)
         return articles
@@ -360,8 +379,8 @@ class MultiSourceScraper:
         
         # SSL bypass for government sites with bad certificates
         verify_ssl = True
-        gov_domains = ['nldc.in', 'nrldc.in', 'wrldc.in', 'srldc.in', 'erldc.in', 
-                       'grid-india.in', 'cea.nic.in', 'pib.gov.in', 'coal.gov.in']
+        gov_domains = ['nldc.in', 'nrldc.in', 'wrldc.in', 'srldc.in', 'erldc.in',
+                       'grid-india.in', 'cea.nic.in', 'pib.gov.in', 'coal.gov.in', 'posoco.in', 'powergrid.in']
         if any(domain in url.lower() for domain in gov_domains):
             verify_ssl = False
 
@@ -371,15 +390,20 @@ class MultiSourceScraper:
                 if r.status_code not in (200, 301, 302):
                     break
 
-                feed = feedparser.parse(r.content)
-                entries = feed.entries[: self.MAX_ITEMS_PER_FEED]
+                if feedparser is not None:
+                    feed = feedparser.parse(r.content)
+                    entries = feed.entries[: self.MAX_ITEMS_PER_FEED]
+                    entry_count = len(feed.entries)
+                else:
+                    entries = self._parse_rss_fallback(r.text)[: self.MAX_ITEMS_PER_FEED]
+                    entry_count = len(entries)
 
                 for entry in entries:
                     title = self._get_text(entry, "title")
                     if not title:
                         continue
                     desc = self._get_text(entry, "summary") or self._get_text(entry, "description") or ""
-                    desc = BeautifulSoup(desc, "html.parser").get_text()[:500]
+                    desc = self._html_to_text(desc)[:500]
                     link = getattr(entry, "link", url)
                     pub = self._parse_date(entry)
 
@@ -397,7 +421,7 @@ class MultiSourceScraper:
                         feed_type=feed_type,
                     ))
 
-                if articles or feed.entries:
+                if articles or entry_count > 0:
                     print(f"  OK  [{feed_type}] {feed_name}: {len(articles)} items")
                     break
 
@@ -451,6 +475,11 @@ class MultiSourceScraper:
 
     @staticmethod
     def _get_text(entry: Any, attr: str) -> str:
+        if isinstance(entry, dict):
+            val = entry.get(attr)
+            if isinstance(val, str):
+                return val.strip()
+            return str(val).strip() if val is not None else ""
         val = getattr(entry, attr, None)
         if val is None:
             return ""
@@ -462,6 +491,11 @@ class MultiSourceScraper:
 
     @staticmethod
     def _parse_date(entry: Any) -> str:
+        if isinstance(entry, dict):
+            val = str(entry.get("published", "")).strip()
+            if val:
+                return val
+            return datetime.now(timezone.utc).isoformat()
         for attr in ("published", "updated", "created"):
             raw = getattr(entry, f"{attr}_parsed", None)
             if raw:
@@ -472,6 +506,57 @@ class MultiSourceScraper:
                 except Exception:
                     pass
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _html_to_text(raw: str) -> str:
+        if not raw:
+            return ""
+        if BeautifulSoup is not None:
+            return BeautifulSoup(raw, "html.parser").get_text()
+        return re.sub(r"<[^>]+>", " ", raw).strip()
+
+    @staticmethod
+    def _parse_rss_fallback(xml_text: str) -> List[Dict[str, str]]:
+        """
+        Minimal RSS/Atom parser when feedparser isn't installed.
+        Returns dict entries with keys similar to feedparser.
+        """
+        import xml.etree.ElementTree as ET
+
+        entries: List[Dict[str, str]] = []
+        if not xml_text:
+            return entries
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return entries
+
+        items = root.findall(".//item")
+        if not items:
+            items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+
+        def _node_text(node: Any, tag: str) -> str:
+            child = node.find(tag)
+            if child is not None and child.text:
+                return child.text.strip()
+            return ""
+
+        for item in items:
+            title = _node_text(item, "title") or _node_text(item, "{http://www.w3.org/2005/Atom}title")
+            link = _node_text(item, "link") or _node_text(item, "{http://www.w3.org/2005/Atom}link")
+            desc = _node_text(item, "description") or _node_text(item, "summary") or _node_text(item, "{http://www.w3.org/2005/Atom}summary")
+            published = _node_text(item, "pubDate") or _node_text(item, "published") or _node_text(item, "{http://www.w3.org/2005/Atom}published")
+            if title:
+                entries.append(
+                    {
+                        "title": title,
+                        "summary": desc,
+                        "description": desc,
+                        "link": link,
+                        "published": published,
+                    }
+                )
+        return entries
 
     @staticmethod
     def trust_score(source_name: str) -> float:

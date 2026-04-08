@@ -11,7 +11,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from monitors.classifier import EnrichedEvent, STATE_PEAK_MW, REGION_MAP
+try:
+    from .classifier import EnrichedEvent, STATE_PEAK_MW, REGION_MAP
+except ImportError:  # pragma: no cover - fallback for script-mode imports
+    from monitors.classifier import EnrichedEvent, STATE_PEAK_MW, REGION_MAP
 
 
 # ---------------------------------------------------------------------------

@@ -86,6 +86,49 @@ def run_unified_simulator(
     }
 
 
+# ---------------------------------------------------------------------------
+# Feature 1: Agentic Negotiation Dialogue Log
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v2/dialogue-log")
+def get_dialogue_log(
+    limit: int = Query(default=50, ge=1, le=500),
+    day_index: int = Query(default=-1, description="Filter by day (-1 = all days)"),
+):
+    """
+    Return the full agentic negotiation dialogue log.
+
+    Each entry is a 3-turn JSON chat (Prosumer → Syndicate → Orchestrator)
+    justifying a power trade. The frontend can animate this at 500ms per turn.
+    """
+    log = list(_SIMULATOR.waterfall.dialogue_log)
+    if day_index >= 0:
+        log = [e for e in log if e.get("day_index") == day_index]
+    return {
+        "status": "success",
+        "total_entries": len(log),
+        "entries": log[-limit:],   # most recent first
+    }
+
+
+# ---------------------------------------------------------------------------
+# Feature 3: Grid Frequency Status
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v2/frequency-status")
+def get_frequency_status():
+    """
+    Return current grid frequency, Lifeboat trigger threshold,
+    and full frequency event log.
+    """
+    monitor = _SIMULATOR.waterfall._freq_monitor
+    return {
+        "status": "success",
+        "summary": monitor.get_status_summary(),
+        "event_log": monitor.get_log(),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 

@@ -428,7 +428,10 @@ class EventClassifier:
         dur = DURATION_HOURS.get(subcategory, DURATION_HOURS["default"])
 
         # Confidence
-        from scrapers.multi_source import MultiSourceScraper as _MS
+        try:
+            from ..scrapers.multi_source import MultiSourceScraper as _MS
+        except ImportError:  # pragma: no cover - fallback for direct script mode
+            from scrapers.multi_source import MultiSourceScraper as _MS
         trust = _MS.trust_score(article.source_name)
 
         event_id = hashlib.md5(

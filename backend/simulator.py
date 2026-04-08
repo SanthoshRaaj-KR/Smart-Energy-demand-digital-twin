@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Tuple
 from engine import APrioriBrain
 from intelligence import StochasticTrigger
 from src.agents.routing_agent.unified_routing_orchestrator import UnifiedRoutingOrchestrator
+from src.agents.routing_agent.parameter_autopsy_agent import ParameterAutopsyAgent
 
 
 class UnifiedOrchestrator:
@@ -33,6 +34,7 @@ class UnifiedOrchestrator:
         self.brain = APrioriBrain(self.backend_dir)
         self.trigger = StochasticTrigger(self.backend_dir)
         self.waterfall = UnifiedRoutingOrchestrator()
+        self.autopsy = ParameterAutopsyAgent()
 
     def _load_grid_config(self) -> Dict[str, Any]:
         cfg_path = self.backend_dir / "config" / "grid_config.json"
@@ -112,6 +114,7 @@ class UnifiedOrchestrator:
                         dr_clearing_price=6.0,
                         day_index=day_index,
                         date_str=date_str,
+                        intel_report=intel,          # Feature 2 (DLR) + Feature 5 (event flags)
                     )
                 waterfall_output = {
                     "steps_executed": len(wf.steps_executed),
@@ -119,6 +122,15 @@ class UnifiedOrchestrator:
                     "load_shedding_mw": {k: round(float(v), 2) for k, v in wf.load_shedding_mw.items()},
                     "memory_warning": wf.memory_warning,
                     "waterfall_complete": wf.waterfall_complete,
+                    # Feature 1: include dialogue log snapshot for this day
+                    "dialogue_log_entries": len(self.waterfall.dialogue_log),
+                    # Feature 3: frequency status
+                    "grid_frequency_hz": round(self.waterfall._freq_monitor.get_current_frequency(), 3),
+                    "frequency_log": self.waterfall._freq_monitor.get_log()[-1:],  # last event
+                    # Feature 2: DLR + carbon log
+                    "carbon_spatial_log": self.waterfall._carbon_spatial_agent.get_full_log(),
+                    # Feature 5: battery lock log
+                    "battery_lock_log": self.waterfall._event_flag_battery_agent.get_log(),
                 }
 
             day_reports.append(
@@ -143,9 +155,33 @@ class UnifiedOrchestrator:
             "master_schedule_model_loaded": master_schedule.get("model_loaded", False),
             "memory_window_size": self.waterfall.MEMORY_WINDOW_SIZE,
             "daily": day_reports,
+            # Feature 1: full dialogue log for all 30 days
+            "dialogue_log": self.waterfall.dialogue_log,
+            # Feature 3: frequency monitor summary
+            "frequency_monitor": self.waterfall._freq_monitor.get_status_summary(),
         }
 
         out = self.outputs_dir / f"simulator_result_{start_date}.json"
         out.write_text(json.dumps(result, indent=2), encoding="utf-8")
         result["saved_path"] = str(out)
+
+        # ===================================================================
+        # FEATURE 4: Parameter Autopsy — runs AFTER the 30-day loop
+        # ===================================================================
+        all_warnings = [
+            day["waterfall"]["memory_warning"]
+            for day in day_reports
+            if day.get("waterfall") and day["waterfall"].get("memory_warning")
+        ]
+        if all_warnings:
+            config_path = self.backend_dir / "config" / "simulation_config.json"
+            autopsy_result = self.autopsy.run_autopsy(
+                warnings=all_warnings,
+                config_path=config_path,
+                output_dir=self.outputs_dir,
+            )
+            result["autopsy_result"] = autopsy_result
+        else:
+            result["autopsy_result"] = {"status": "NO_WARNINGS", "message": "Clean run — no config changes needed."}
+
         return result
